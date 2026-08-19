@@ -150,7 +150,7 @@ test "engine.run removes intermediate step files, keeps gen_final" {
     }
 }
 
-fn fileExists(path: []const u8) bool {
+pub fn fileExists(path: []const u8) bool {
     const fd = std.posix.openat(std.posix.AT.FDCWD, path, std.posix.O{ .ACCMODE = .RDONLY }, 0) catch |e| {
         if (e == error.FileNotFound) return false;
         return true;

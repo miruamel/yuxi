@@ -30,6 +30,10 @@ pub const Ctx = struct {
     /// rejects a clean run whose output doesn't match, feeding the mismatch
     /// back through the self-correction loop.
     expected: ?[]const u8,
+    /// Optional injected LLM completion backend. When set, transport.complete
+    /// dispatches here instead of the built-in mock/http — used by tests to
+    /// script backend behavior (e.g. fail-then-succeed) without network.
+    llm_fn: ?LlmFn,
     failures: usize,
     events: std.ArrayList([]const u8),
 
@@ -48,6 +52,7 @@ pub const Ctx = struct {
             .eval_error = null,
             .failures = 0,
             .expected = null,
+            .llm_fn = null,
             .events = try std.ArrayList([]const u8).initCapacity(allocator, 0),
         };
     }
@@ -69,6 +74,11 @@ pub const Ctx = struct {
         logLine(self.io, fmt, args);
     }
 };
+
+/// Injectable LLM completion backend signature. Matches transport.complete's
+/// call shape so a test (or future real backend) can replace the built-in
+/// mock/http dispatch via Ctx.llm_fn.
+pub const LlmFn = *const fn (std.mem.Allocator, std.Io, *Ctx, []const u8, []const u8) anyerror![]u8;
 
 pub fn logLine(io: std.Io, comptime fmt: []const u8, args: anytype) void {
     var buf: [2048]u8 = undefined;

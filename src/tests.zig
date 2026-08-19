@@ -10,3 +10,4 @@ const _evaluator = @import("evaluator/evaluator.zig");
 const _engine = @import("core/engine.zig");
 
 const _transport = @import("llm/transport.zig");
+const _selfcorr = @import("core/selfcorr_test.zig");

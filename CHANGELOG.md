@@ -31,6 +31,10 @@ tracked history by capability; commit hashes reference `git log`.
   to "produces the specified output". Child stdout/stderr are captured to a temp
   file (std.process.run's pipe capture was empty in this environment), which also
   fixes previously-blank self-correction error feedback.
+- **Injectable LLM backend seam** — `Ctx.llm_fn` lets a test (or future real
+  backend) replace the built-in mock/http dispatch in `transport.complete`.
+  Used to add an engine-level integration test proving the self-correction
+  loop recovers from a broken first build (fail first code-gen, then succeed).
 
 ## Engineering
 

@@ -3,6 +3,13 @@ const types = @import("../core/types.zig");
 
 /// Single LLM entry point. Dispatches on Ctx.backend.
 pub fn complete(allocator: std.mem.Allocator, io: std.Io, ctx: *types.Ctx, system: []const u8, user: []const u8) ![]u8 {
+
+    // Injected backend seam: when set, fully replace the built-in dispatch
+    // (used by tests to script backend behavior without network/curl).
+    if (ctx.llm_fn) |f| {
+        ctx.tokens += user.len / 4 + system.len / 8 + 16;
+        return f(allocator, io, ctx, system, user);
+    }
     if (ctx.cache) |c| {
         if (c.get(allocator, @tagName(ctx.backend), system, user) catch null) |hit| {
             return hit;

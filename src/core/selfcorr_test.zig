@@ -1,0 +1,77 @@
+const std = @import("std");
+const types = @import("types.zig");
+const fs = @import("../util/fs.zig");
+const engine = @import("engine.zig");
+
+// Call counter for the injected backend so the test can assert the engine
+// actually retried a failed first build.
+var cg_calls: usize = 0;
+
+// Injected LLM backend: behaves like the mock except the very first code-
+// generator call emits a compile error, forcing the engine's self-correction
+// loop to rebuild with feedback and recover.
+fn llmFailFirst(alloc: std.mem.Allocator, io: std.Io, ctx: *types.Ctx, system: []const u8, user: []const u8) anyerror![]u8 {
+    _ = ctx;
+    _ = io;
+    if (std.mem.indexOf(u8, system, "decomposer") != null) {
+        return alloc.dupe(u8,
+            \\STEP: design the function signature
+            \\STEP: implement the body
+            \\STEP: add a unit test
+        );
+    }
+    if (std.mem.indexOf(u8, system, "code generator") != null) {
+        var n: usize = 0;
+        if (std.mem.indexOf(u8, user, "Implement step ")) |p| {
+            const rest = user[p + "Implement step ".len ..];
+            if (std.mem.indexOfScalar(u8, rest, ':')) |c| {
+                n = std.fmt.parseUnsigned(usize, rest[0..c], 10) catch 0;
+            }
+        }
+        cg_calls += 1;
+        if (cg_calls == 1) {
+            // First code-gen call (step0, attempt 0): a compile error so the
+            // composed program fails and the engine retries with feedback.
+            return std.fmt.allocPrint(alloc,
+                \\pub fn step{d}() void {{ undefined_symbol_xyz(); }}
+            , .{n});
+        }
+        return std.fmt.allocPrint(alloc,
+            \\pub fn step{d}() void {{
+            \\    const a: i32 = 2;
+            \\    const b: i32 = 3;
+            \\    const sum = a + b;
+            \\    std.debug.print("step result: 2+3={{d}}\n", .{{sum}});
+            \\}}
+        , .{n});
+    }
+    if (std.mem.indexOf(u8, system, "critic") != null) {
+        return alloc.dupe(u8, "APPROVE");
+    }
+    return alloc.dupe(u8, user);
+}
+
+test "engine.run self-corrects a broken first build via retry" {
+    const allocator = std.heap.page_allocator;
+    const io = std.Io.Threaded.global_single_threaded.io();
+    const workdir = "/tmp/yuxi_selfcorr_test";
+    try fs.ensureDir(allocator, workdir);
+
+    var ctx = try types.Ctx.init(allocator, io, .empty, .no_hitl, .mock, null, "", workdir);
+    ctx.llm_fn = llmFailFirst;
+    cg_calls = 0;
+    try engine.run(allocator, io, &ctx, "design a calculator");
+
+    // A retry must have happened (more than one attempt's worth of code-gen).
+    try std.testing.expect(cg_calls > 3);
+    // Recovery: the verified build was deployed (gen_final.zig present).
+    const final_path = try std.fmt.allocPrint(allocator, "{s}/gen_final.zig", .{workdir});
+    defer allocator.free(final_path);
+    try std.testing.expect(engine.fileExists(final_path));
+    // Intermediate step files cleaned up.
+    for (0..3) |i| {
+        const p = try std.fmt.allocPrint(allocator, "{s}/gen_{d}.zig", .{ workdir, i });
+        defer allocator.free(p);
+        try std.testing.expect(!engine.fileExists(p));
+    }
+}
