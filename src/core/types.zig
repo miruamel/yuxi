@@ -25,6 +25,7 @@ pub const Ctx = struct {
     tokens: usize,
     cache: ?*cache_mod.Cache,
     eval_error: ?[]const u8,
+    failures: usize,
     events: std.ArrayList([]const u8),
 
     pub fn init(allocator: std.mem.Allocator, io: std.Io, environ: std.process.Environ, mode: Mode, backend: LlmBackend, key: ?[]const u8, base: []const u8, workdir: []const u8) !Ctx {
@@ -40,6 +41,7 @@ pub const Ctx = struct {
             .tokens = 0,
             .cache = null,
             .eval_error = null,
+            .failures = 0,
             .events = try std.ArrayList([]const u8).initCapacity(allocator, 0),
         };
     }
