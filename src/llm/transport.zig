@@ -35,21 +35,38 @@ fn mockComplete(allocator: std.mem.Allocator, system: []const u8, user: []const 
         );
     }
     if (std.mem.indexOf(u8, system, "code generator") != null) {
-        // The builder passes "Implement step N: ...", so name the function
+        // The builder passes "Implement step N: <name>", so name the function
         // uniquely per step; the engine composes all steps into one binary.
+        // The mock orchestrator emits a fixed 3-step plan whose final step is
+        // "add a unit test"; only that step emits output, mirroring how a real
+        // decomposition's run/verify step is the sole printer. This keeps the
+        // composed binary's stdout single-line so `--expect` verification
+        // matches deterministically instead of triplicating the line.
         var n: usize = 0;
+        var emit = true;
         if (std.mem.indexOf(u8, user, "Implement step ")) |p| {
             const rest = user[p + "Implement step ".len ..];
             if (std.mem.indexOfScalar(u8, rest, ':')) |c| {
                 n = std.fmt.parseUnsigned(usize, rest[0..c], 10) catch 0;
+                const name = std.mem.trim(u8, rest[c + 1 ..], " ");
+                emit = std.mem.indexOf(u8, name, "test") != null;
             }
+        }
+        if (emit) {
+            return std.fmt.allocPrint(allocator,
+                \\pub fn step{d}() void {{
+                \\    const a: i32 = 2;
+                \\    const b: i32 = 3;
+                \\    const sum = a + b;
+                \\    std.debug.print("step result: 2+3={{d}}\n", .{{sum}});
+                \\}}
+            , .{n});
         }
         return std.fmt.allocPrint(allocator,
             \\pub fn step{d}() void {{
             \\    const a: i32 = 2;
             \\    const b: i32 = 3;
-            \\    const sum = a + b;
-            \\    std.debug.print("step result: 2+3={{d}}\n", .{{sum}});
+            \\    _ = a + b;
             \\}}
         , .{n});
     }
