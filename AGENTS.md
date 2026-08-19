@@ -117,8 +117,8 @@ Gotchas paid for this cycle:
 Flat imports from `src/`: `@import("core/types.zig")`, not `../core/types.zig`.
 
 ## Known gaps (next cycles)
-- Remote `miruamel/Xunma` is 404; no push/release until a remote is provisioned
-  (CI workflow exists but cannot run without one).
+- Remote `miruamel/yuxi` (public) provisioned; `master` pushed, CI green on push to
+  `master`/`main`. Release tagging still batched per §28 (no tag cut yet).
 - The engine now composes every step into ONE runnable program (`gen_final.zig`):
   each step emits a `pub fn stepN() void` fragment, the engine merges them under a
   `main` harness, and the evaluator compiles+runs the single artifact. Deploy gates
