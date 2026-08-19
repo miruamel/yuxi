@@ -3,6 +3,37 @@
 All notable changes to the Yuxi engine are recorded here. Entries group the
 tracked history by capability; commit hashes reference `git log`.
 
+## v0.1.0 (2026-08-19)
+
+First tagged release of the Yuxi (玉溪) autonomous software-evolution engine,
+covering the core pipeline plus the knowledge base, offline record/replay, and
+batch-task capabilities shipped through commit `6309478`.
+
+### Core pipeline
+- Gateway → orchestrator (decompose) → builder/critic (per step) → compose → evaluator → deploy.
+- Self-correction: build → compose → evaluate retries up to 3×, feeding compiler/run `stderr` back to the builder.
+- Critic feedback loop: a `REJECT` regenerates the rejected step with the critic's reason; resilience fallback is last resort.
+- Resilience + monitoring: per-run health assessment and degradation counters (retries, critic rejections, mock fallbacks, token-budget breaches).
+
+### Knowledge base (`--kb`)
+- Persistent, replayable lesson ledger; prior lessons are injected into the decomposer prompt and each run's outcome plus counters are recorded, closing the learning loop.
+
+### Offline + batch
+- `--replay[=FILE]`: drive the real `.openai`/`.local` dispatch offline from a recorded transcript (no API key, no network) for CI/tests.
+- `--record[=FILE]`: capture every real LLM response as a `--replay`-compatible transcript — record once, replay forever.
+- `--tasks FILE`: batch mode running N tasks with isolated workdirs.
+- `--cache[=DIR]`: incremental on-disk LLM-response cache.
+- `--expect TEXT`, `--max-tokens N`: behavioral verification and a soft token-budget ceiling.
+
+### Engineering
+- Engineered to Zig 0.16; hard invariants (≤5 files/dir, ≤200 SLOC/file, deep nesting) enforced.
+- CI green on push/PR: `zig build`, `zig build test`, `zig fmt --check src`.
+- Integration tests: self-correction recovery, critic denylist block (§19 security gate), token-budget abort, and the record→replay round trip.
+
+### Known open questions (co-owner forks)
+- #1 gateway rate-limit is a no-op — enforce or remove.
+- #2 `--dry-run`/plan-mode and `--hitl` approval gating scope.
+
 ## Pipeline capabilities
 
 - **Self-correction (build+eval feedback)** — `7fbfc5e`. The pipeline retries
