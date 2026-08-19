@@ -39,7 +39,7 @@ Each generated `gen_N.zig` is committed into an *isolated* git repo inside
 explicit identity (`git -c user.name=Yuxi Engine -c user.email=yuxi@localhost`)
 because the spawned `git` inherits no identity in this env.
 **Gating:** `engine.zig` only calls `deploy.run` when `evaluator.run`
-(`zig ast-check`) returns true. Invalid output is never committed and no
+(`zig build-exe` compile + run) returns true. Invalid output is never committed and no
 workdir repo is created.
 
 ## Smoke test & gotchas
@@ -67,8 +67,9 @@ Flat imports from `src/`: `@import("core/types.zig")`, not `../core/types.zig`.
 ## Known gaps (next cycles)
 - Remote `miruamel/Xunma` is 404; no push/release until a remote is provisioned
   (CI workflow exists but cannot run without one).
-- Evaluator only runs `zig ast-check` (syntax); semantic/type errors pass the
-  gate. A full compile+run of the generated module is still missing.
-- Generated `gen_N.zig` are standalone snippets; the engine does not yet compose
-  them into one buildable, runnable artifact (real evolution output).
+- Evaluator now compiles each `gen_N.zig` with `zig build-exe` and **runs** the
+  binary, gating deploy on a clean run (not just syntax). Each step is a complete,
+  runnable Zig program.
+- The engine still emits one file per step; it does not yet compose multiple steps
+  into a single buildable binary (real multi-step evolution output).
 - `.gitignore` covers binaries, build dirs, `gen_*.zig`, `.yuxi_cache`, `/ae_out/`.

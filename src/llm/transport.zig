@@ -29,8 +29,12 @@ fn mockComplete(allocator: std.mem.Allocator, system: []const u8, user: []const 
     }
     if (std.mem.indexOf(u8, system, "code generator") != null) {
         return allocator.dupe(u8,
-            \\pub fn solve(a: i32, b: i32) i32 {
-            \\    return a + b;
+            \\const std = @import("std");
+            \\pub fn main() void {
+            \\    const a: i32 = 2;
+            \\    const b: i32 = 3;
+            \\    const sum = a + b;
+            \\    std.debug.print("add(2,3)={d}\n", .{sum});
             \\}
         );
     }

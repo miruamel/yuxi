@@ -6,7 +6,7 @@ const resilience = @import("../resilience/resilience.zig");
 
 pub fn run(ctx: *types.Ctx, step: *types.Step, path: []const u8) !bool {
     ctx.log("[builder] planning step {d}: {s}", .{ step.id, step.name });
-    const sys = "You are a code generator. Output ONLY Zig source code, no markdown.";
+    const sys = "You are a code generator. Output a complete, runnable Zig program with `pub fn main() void`. No markdown, no explanation.";
     const user = try std.fmt.allocPrint(ctx.allocator, "Implement: {s}", .{step.name});
     defer ctx.allocator.free(user);
 
