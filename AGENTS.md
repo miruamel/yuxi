@@ -204,3 +204,5 @@ Flat imports from `src/`: `@import("core/types.zig")`, not `../core/types.zig`.
   **Stakes:** gating eval behind a human breaks the autonomous loop and the §30
   runtime-feedback signal; gating only persistence keeps oversight at the
   irreversible boundary without throttling self-correction.
+
+Tracked for co-owner decision: issue #2 (--dry-run plan scope; --hitl gating scope).
