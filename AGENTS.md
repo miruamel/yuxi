@@ -17,6 +17,7 @@ evolution engine described in `DESIGN.md`.
 - `--task TEXT` or trailing arg — the task prompt.
 - `--out DIR` — workdir (default `ae_out/`); isolated git repo lives here.
 - `--cache[=DIR]` — opt-in on-disk LLM-response cache (default `.yuxi_cache`).
+- --replay[=FILE] — opt-in recorded-LLM-response file; `transport.complete` serves entries in call order for `.openai`/`.local` without calling the network (offline CI/tests). Entries delimited by `---` lines.
 - `--expect TEXT` — behavioral verification (see below).
 - `--max-tokens N` — soft LLM-spend ceiling; `engine.run` aborts the build loop
   once `ctx.tokens` reaches N, records `engine: token budget exceeded`, deploys
@@ -43,6 +44,18 @@ evolution engine described in `DESIGN.md`.
 sha256(backend \0 system \0 user) and serves prior responses from disk without
 re-calling the model. Opt-in; default dir `.yuxi_cache`. Cache hits also skip the
 `ctx.tokens` increment, so monitoring reports real generation cost.
+## Offline replay mode (feat)
+`--replay[=FILE]` makes `transport.complete` serve recorded LLM responses in
+call order instead of calling the network, when the backend is `.openai` or
+`.local` and `Ctx.replay_path` is set. Entries are separated by a line that is
+exactly `---`, so a recorded response may span multiple lines (e.g. a
+decomposer plan). `Ctx.replay_idx` tracks position; running past the last entry
+is a hard error. Off by default (null): production needs no replay file, and
+the mock backend is unaffected. Purpose: exercise the real `.openai`/`.local`
+dispatch — including curl auth, response handling, and the full engine loop —
+offline, with no API key, for CI and integration tests. `transport_test.zig`
+covers ordered playback (unit) and a full `engine.run` deploy through the
+real openai path via replay.
 
 ## Deploy layer (verified checkpoint)
 The composed `gen_final.zig` (one per task) is committed into an *isolated* git repo inside
@@ -157,6 +170,7 @@ Flat imports from `src/`: `@import("core/types.zig")`, not `../core/types.zig`.
 - `.gitignore` covers binaries, build dirs, `gen_*.zig`, `.yuxi_cache`, `/ae_out/`.
 
 ## Recent cycles (category balance, §14)
+- `5521d48` feat: offline replay mode (--replay) drives real .openai/.local backend path offline for CI/tests (§11/§21).
 - `fac5fa4` feat: persistent knowledge base (--kb) learns lessons across runs (§11/§12).
 - `d1c7cc0` feat: enrich knowledge-base lessons with degradation counters (§12).
 - `3a16e4d` feat: batch task execution via --tasks (loop.runTasks: per-task workdir + batch health report).
