@@ -22,6 +22,7 @@ pub fn main(init: std.process.Init) !void {
     const key: ?[]const u8 = if (raw_key) |k| arena.dupe(u8, k) catch null else null;
 
     var ctx = try types.Ctx.init(arena, io, init.minimal.environ, cfg.mode, cfg.backend, key, base, cfg.workdir);
+    ctx.expected = cfg.expect;
     ctx.cache = blk: {
         const cp = cfg.cache_path orelse break :blk null;
         const c = arena.create(cache_mod.Cache) catch break :blk null;

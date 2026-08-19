@@ -7,6 +7,7 @@ pub const Config = struct {
     task: []const u8,
     workdir: []const u8,
     cache_path: ?[]const u8,
+    expect: ?[]const u8,
 };
 
 pub fn parse(gpa: std.mem.Allocator, io: std.Io, args: *std.process.Args.Iterator) !Config {
@@ -16,6 +17,7 @@ pub fn parse(gpa: std.mem.Allocator, io: std.Io, args: *std.process.Args.Iterato
     var task: ?[]const u8 = null;
     var workdir: []const u8 = "ae_out";
     var cache_path: ?[]const u8 = null;
+    var expect: ?[]const u8 = null;
 
     _ = args.next(); // argv[0]
     while (args.next()) |arg| {
@@ -23,6 +25,8 @@ pub fn parse(gpa: std.mem.Allocator, io: std.Io, args: *std.process.Args.Iterato
             if (args.next()) |w| workdir = w;
         } else if (std.mem.eql(u8, arg, "--task")) {
             if (args.next()) |t| task = t;
+        } else if (std.mem.eql(u8, arg, "--expect")) {
+            if (args.next()) |e| expect = e;
         } else if (std.mem.eql(u8, arg, "--cache")) {
             cache_path = ".yuxi_cache";
         } else if (std.mem.startsWith(u8, arg, "--cache=")) {
@@ -37,7 +41,7 @@ pub fn parse(gpa: std.mem.Allocator, io: std.Io, args: *std.process.Args.Iterato
         printHelp(io);
         return error.MissingTask;
     };
-    return .{ .mode = mode, .backend = backend, .task = t, .workdir = workdir, .cache_path = cache_path };
+    return .{ .mode = mode, .backend = backend, .task = t, .workdir = workdir, .cache_path = cache_path, .expect = expect };
 }
 fn printHelp(io: std.Io) void {
     types.logLine(io, "Yuxi (玉溪): autonomous software evolution engine", .{});

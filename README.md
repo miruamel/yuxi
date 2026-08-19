@@ -18,8 +18,8 @@ runs fully offline for development and testing.
 ```
 
 Flags: `--mock|--openai|--local`, `--hitl|--no-hitl`, `--task TEXT`,
-`--out DIR`, `--cache[=DIR]`. Environment: `OPENAI_API_KEY` / `OPENAI_BASE`,
-`LOCAL_BASE`, `AE_TOKEN` (optional gateway auth token).
+`--out DIR`, `--cache[=DIR]`, `--expect TEXT`. Environment: `OPENAI_API_KEY` /
+`OPENAI_BASE`, `LOCAL_BASE`, `AE_TOKEN` (optional gateway auth token).
 
 ## Pipeline
 
@@ -43,7 +43,9 @@ Gateway -> Orchestrator -> (Builder -> Critic)* -> Compose -> Evaluator -> Deplo
 - **Compose** — merge all step fragments into one `gen_final.zig` with a `main`
   harness that calls each `stepN()`.
 - **Evaluator** — compile **and run** `gen_final.zig`. On failure the error is
-  stored and the whole pipeline rebuilds (up to 3 attempts) with feedback.
+  stored and the whole pipeline rebuilds (up to 3 attempts) with feedback. With
+  `--expect TEXT`, a clean run whose trimmed stdout doesn't equal the spec also
+  fails and drives the same self-correction loop (behavioral verification).
 - **Deploy** — commit `gen_final.zig` to an isolated git repo in `workdir`;
   intermediate `gen_*.zig` files are removed afterward.
 - **Resilience** — per-run failure counter and circuit breaker (falls back to

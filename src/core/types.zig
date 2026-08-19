@@ -25,6 +25,11 @@ pub const Ctx = struct {
     tokens: usize,
     cache: ?*cache_mod.Cache,
     eval_error: ?[]const u8,
+    /// Optional caller-supplied expected stdout (trimmed) for behavioral
+    /// verification. Borrowed: must outlive the run. When set, the evaluator
+    /// rejects a clean run whose output doesn't match, feeding the mismatch
+    /// back through the self-correction loop.
+    expected: ?[]const u8,
     failures: usize,
     events: std.ArrayList([]const u8),
 
@@ -42,6 +47,7 @@ pub const Ctx = struct {
             .cache = null,
             .eval_error = null,
             .failures = 0,
+            .expected = null,
             .events = try std.ArrayList([]const u8).initCapacity(allocator, 0),
         };
     }

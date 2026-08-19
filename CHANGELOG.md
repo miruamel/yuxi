@@ -25,6 +25,13 @@ tracked history by capability; commit hashes reference `git log`.
 - **Transport JSON escapes** — `468a77d`. `extractContent` unescapes
   `\n \t \r \b \f` from OpenAI-style responses.
 
+- **Behavioral verification (`--expect`)** — the evaluator compares a clean run's
+  trimmed stdout against a caller-supplied spec; a mismatch sets `ctx.eval_error`
+  and drives the existing self-correction loop, upgrading "runs without crashing"
+  to "produces the specified output". Child stdout/stderr are captured to a temp
+  file (std.process.run's pipe capture was empty in this environment), which also
+  fixes previously-blank self-correction error feedback.
+
 ## Engineering
 
 - **Resilience state per-run** — `808a469`. `failures` moved from a module-level
