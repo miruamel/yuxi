@@ -37,6 +37,6 @@ Flat imports from `src/`: `@import("core/types.zig")`, not `../core/types.zig`.
 
 ## Known gaps (next cycles)
 - No `build.zig` / CI yet; verify via `zig build-exe` + `zig test` directly.
-- No git repo yet; init with `.gitignore` for binaries (`yuxi`, `ae`),
-  `gen_*.zig` (generated), `.yuxi_cache`.
+- Git repo initialized (initial commit eacb0ca); `.gitignore` covers binaries
+  (`yuxi`, `ae`), `gen_*.zig` (generated), `.yuxi_cache`.
 - `workdir` config default `ae_out` is not yet used by Builder (writes to CWD).
