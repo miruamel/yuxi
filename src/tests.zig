@@ -13,3 +13,4 @@ const _transport = @import("llm/transport.zig");
 const _monitoring = @import("monitoring/monitoring_test.zig");
 const _selfcorr = @import("core/selfcorr_test.zig");
 const _loop = @import("loop_test.zig");
+const _fs = @import("util/fs.zig");
