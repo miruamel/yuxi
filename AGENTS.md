@@ -77,6 +77,14 @@ sets `ctx.eval_error`, which the self-correction loop feeds back to the builder 
 compile errors. Mock backend output is deterministic, so `--expect "step result: 2+3=5"`
 passes and `--expect "nope"` triggers the retry path.
 
+## Run metrics (observability, feat)
+`Ctx` carries five autonomy-health counters incremented at their event
+sites: `critic_rejections`, `mock_fallbacks`, `retries` (self-correction
+rebuilds), `deploys`, `token_budgets_exceeded`. `monitoring.report` emits
+them alongside events/tokens so the loop can read its own effectiveness
+(critic reject rate, mock-fallback frequency, retry churn, deploy rate)
+without parsing event strings.
+
 ## Smoke test & gotchas
 End-to-end check, offline (no API key):
 ```bash
@@ -131,6 +139,7 @@ Flat imports from `src/`: `@import("core/types.zig")`, not `../core/types.zig`.
 - `.gitignore` covers binaries, build dirs, `gen_*.zig`, `.yuxi_cache`, `/ae_out/`.
 
 ## Recent cycles (category balance, §14)
+- `8b62080` feat: structured run metrics for autonomy health (§30/§32).
 - `da06e74` refactor: extract step build into src/core/step.zig (§8 SLOC cap).
 - `ff96295` feat: token/cost budget cap (`--max-tokens`).
 - `d60859b` test: engine-level critic denylist integration test (via `Ctx.llm_fn` seam).

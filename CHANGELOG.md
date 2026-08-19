@@ -41,6 +41,12 @@ tracked history by capability; commit hashes reference `git log`.
   `ctx.tokens` (counted per completion in `transport.complete`) reaches it,
   recording `engine: token budget exceeded` and deploying nothing. Default off.
 
+- **Run metrics (observability)** — `8b62080`. `Ctx` carries five autonomy-health
+  counters — `critic_rejections`, `mock_fallbacks`, `retries` (self-correction
+  rebuilds), `deploys`, `token_budgets_exceeded` — incremented at their event
+  sites and emitted by `monitoring.report`, so the loop can read its own
+  effectiveness without parsing event strings.
+
 ## Engineering
 
 - **Resilience state per-run** — `808a469`. `failures` moved from a module-level
