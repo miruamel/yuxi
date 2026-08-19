@@ -1,11 +1,12 @@
 const std = @import("std");
 const types = @import("../core/types.zig");
 const transport = @import("../llm/transport.zig");
+const knowledge = @import("../knowledge/knowledge.zig");
 
 pub fn run(ctx: *types.Ctx, task: []const u8, steps: *std.ArrayList(types.Step)) !bool {
     ctx.log("[orchestrator] decomposing task", .{});
     const sys = "You are a task decomposer. Return numbered steps, one per line, prefixed 'STEP: '.";
-    const user = try std.fmt.allocPrint(ctx.allocator, "Task: {s}", .{task});
+    const user = try knowledge.injectPrompt(ctx, task);
     defer ctx.allocator.free(user);
     const resp = try transport.complete(ctx.allocator, ctx.io, ctx, sys, user);
     defer ctx.allocator.free(resp);

@@ -96,6 +96,12 @@ pub fn run(allocator: std.mem.Allocator, io: std.Io, ctx: *types.Ctx, task: []co
     resilience.summary(ctx);
     // LAYER 8: Knowledge
     knowledge.log(ctx, "task pipeline complete");
+    if (ctx.kb_path) |_| {
+        const outcome = if (verified) "deployed" else "failed";
+        const lesson = try std.fmt.allocPrint(allocator, "- {s}: {s} ({d} steps, deploys={d}, retries={d})", .{ task, outcome, steps.items.len, ctx.deploys, ctx.retries });
+        defer allocator.free(lesson);
+        knowledge.recordLesson(ctx, lesson) catch |e| ctx.log("[knowledge] save failed: {s}", .{@errorName(e)});
+    }
     // LAYER 9: Monitoring
     monitoring.report(ctx);
     monitoring.assessHealth(ctx);
@@ -122,6 +128,7 @@ pub fn newCtx(allocator: std.mem.Allocator, io: std.Io, environ: std.process.Env
         c.* = cache_mod.Cache.init(allocator, cp) catch break :blk null;
         break :blk c;
     };
+    ctx.kb_path = cfg.kb_path;
     return ctx;
 }
 /// Merge step fragments into one runnable program: a std import, each step

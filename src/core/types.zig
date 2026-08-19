@@ -35,6 +35,10 @@ pub const Ctx = struct {
     /// dispatches here instead of the built-in mock/http — used by tests to
     /// script backend behavior (e.g. fail-then-succeed) without network.
     llm_fn: ?LlmFn,
+    /// Optional path to a persisted knowledge base. When set, the engine
+    /// records a per-run lesson here and the orchestrator prepends prior
+    /// lessons to its decomposition prompt. Null (and a no-op) by default.
+    kb_path: ?[]const u8 = null,
     failures: usize,
     critic_rejections: usize,
     mock_fallbacks: usize,
