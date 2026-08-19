@@ -1,0 +1,22 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Zig
+        uses: goto-bus/setup-zig@v2
+        with:
+          version: 0.16.0
+      - name: Build
+        run: zig build
+      - name: Test
+        run: zig build test
+      - name: Format check
+        run: zig fmt --check src

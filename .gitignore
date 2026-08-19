@@ -2,6 +2,8 @@
 /yuxi
 /ae
 *.o
+zig-out/
+zig-cache/
 
 # generated during runs
 gen_*.zig

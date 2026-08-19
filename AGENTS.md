@@ -5,15 +5,16 @@ evolution engine described in `DESIGN.md`.
 
 ## Build & Run
 ```bash
-/opt/zig/zig build-exe src/main.zig -femit-bin=yuxi
-./yuxi --no-hitl --mock --task "write a function that adds two ints"
-./yuxi --hitl --local --task "..."     # pauses y/N before write
+/opt/zig/zig build                 # produces zig-out/bin/yuxi
+./zig-out/bin/yuxi --no-hitl --mock --task "write a function that adds two ints"
+./zig-out/bin/yuxi --hitl --local --task "..."   # pauses y/N before write
 ```
 
 ## Verify
 ```bash
-/opt/zig/zig test src/util/cache.zig   # cache unit test
-/opt/zig/zig fmt --check src           # lint
+/opt/zig/zig build                  # compile binary
+/opt/zig/zig build test             # cache unit test
+/opt/zig/zig fmt --check src        # lint
 ```
 
 ## Architecture (`src/`)
@@ -36,7 +37,6 @@ re-calling the model. Opt-in; default dir `.yuxi_cache`. Cache hits also skip th
 Flat imports from `src/`: `@import("core/types.zig")`, not `../core/types.zig`.
 
 ## Known gaps (next cycles)
-- No `build.zig` / CI yet; verify via `zig build-exe` + `zig test` directly.
+- CI workflow added (.github/workflows/ci.yml) but needs a remote to actually run.
 - Git repo initialized (initial commit eacb0ca); `.gitignore` covers binaries
-  (`yuxi`, `ae`), `gen_*.zig` (generated), `.yuxi_cache`.
-- `workdir` config default `ae_out` is not yet used by Builder (writes to CWD).
+  (`yuxi`, `ae`), build dirs (`zig-out/`, `zig-cache/`), `gen_*.zig`, `.yuxi_cache`.
