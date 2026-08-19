@@ -40,6 +40,11 @@ tracked history by capability; commit hashes reference `git log`.
   LLM spend (`ctx.max_tokens`); `engine.run` aborts the build loop once
   `ctx.tokens` (counted per completion in `transport.complete`) reaches it,
   recording `engine: token budget exceeded` and deploying nothing. Default off.
+- **Autonomy-health verdict** — `1ae73b6`. `monitoring.assessHealth` emits a
+  WARN through the event log when a cycle is unhealthy (no deploy, token
+  budget exceeded, self-correction exhausted without deploy, mock-fallback-
+  dominated), closing the §30/§32 feedback loop on the run-metrics counters
+  from `8b62080`. Pure diagnostic: no pipeline behavior change.
 
 - **Run metrics (observability)** — `8b62080`. `Ctx` carries five autonomy-health
   counters — `critic_rejections`, `mock_fallbacks`, `retries` (self-correction

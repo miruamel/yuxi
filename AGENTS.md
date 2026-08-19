@@ -140,6 +140,7 @@ Flat imports from `src/`: `@import("core/types.zig")`, not `../core/types.zig`.
 
 ## Recent cycles (category balance, §14)
 - `8b62080` feat: structured run metrics for autonomy health (§30/§32).
+- `1ae73b6` feat: end-of-run autonomy-health verdict consumes run metrics (§30/§32).
 - `d4a64c2` docs: README current with `--max-tokens` + run-metrics counters (§24).
 - `da06e74` refactor: extract step build into src/core/step.zig (§8 SLOC cap).
 - `ff96295` feat: token/cost budget cap (`--max-tokens`).
