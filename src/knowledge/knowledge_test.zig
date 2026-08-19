@@ -57,3 +57,25 @@ test "knowledge injectPrompt is plain when kb missing" {
     defer alloc.free(prompt);
     try std.testing.expectEqualStrings("Task: do a thing", prompt);
 }
+
+test "knowledge recordLesson writes an enriched per-run lesson" {
+    const alloc = std.testing.allocator;
+    const io = std.Io.Threaded.global_single_threaded.io();
+    const base = "/tmp/yuxi_kb_record_test";
+    const path = try std.fmt.allocPrint(alloc, "{s}/kb.md", .{base});
+    defer alloc.free(path);
+    defer std.Io.Dir.deleteTree(std.Io.Dir.cwd(), io, base) catch {};
+    var ctx = try types.Ctx.init(alloc, io, .empty, .no_hitl, .mock, null, "", base);
+    ctx.kb_path = path;
+    ctx.deploys = 1;
+    ctx.critic_rejections = 2;
+    ctx.mock_fallbacks = 1;
+    ctx.token_budgets_exceeded = 0;
+    try knowledge.recordLesson(&ctx, "add a feature", 3);
+    const got = (try knowledge.load(alloc, path)).?;
+    defer alloc.free(got);
+    try std.testing.expect(std.mem.indexOf(u8, got, "add a feature: deployed") != null);
+    try std.testing.expect(std.mem.indexOf(u8, got, "steps=3") != null);
+    try std.testing.expect(std.mem.indexOf(u8, got, "critic_rej=2") != null);
+    try std.testing.expect(std.mem.indexOf(u8, got, "mock_fb=1") != null);
+}
