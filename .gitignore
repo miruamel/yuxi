@@ -1,0 +1,11 @@
+# build artifacts / bundled binaries
+/yuxi
+/ae
+*.o
+
+# generated during runs
+gen_*.zig
+zt_cache_*
+
+# cache
+.yuxi_cache
