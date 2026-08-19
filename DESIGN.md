@@ -7,15 +7,16 @@ local server (ollama/llama.cpp); `mock` runs fully offline for dev/test.
 ## Topology (loop)
 
 ```
-Gateway -> Orchestrator -> Builder -> Critic -> Evaluator
-   ^                                        |
-   |                                        v
-Monitoring <- Knowledge <- Resilience <- Deploy
+Gateway -> Orchestrator -> (Builder -> Critic)* -> Compose -> Evaluator -> Deploy
+                                          ^                          |
+                                          \_______ Resilience <- Knowledge <- Monitoring
 ```
 
 `Monitoring -> Gateway` is the outer autonomous cycle. One task runs a forward
-pass; a rejected `Critic` triggers one retry via `Resilience` fallback before
-`Evaluator` compile-checks each generated file.
+pass. A rejected `Critic` regenerates that step with the critic's reason as
+builder feedback; the `Evaluator` compiles and runs the composed program, and on
+failure the pipeline rebuilds (up to 3 attempts) with the error fed back to the
+builder (self-correction).
 
 ## Layers
 
@@ -24,10 +25,10 @@ pass; a rejected `Critic` triggers one retry via `Resilience` fallback before
 2. **Orchestrator** — LLM task decomposer -> numbered `STEP:` plan.
 3. **Builder** — LLM planner + generator -> writes a `.zig` file. HITL gate
    before write when `mode == hitl`.
-4. **Critic** — fast-path rules (rejects `panic(`) + LLM `APPROVE`/`REJECT`.
-5. **Evaluator** — `zig ast-check` compile gate per file.
-6. **Deploy** — isolated git repo in `workdir`; `git -C {wd} add` + `git commit` per stable file (best-effort).
-7. **Resilience** — circuit breaker; on LLM failure, fallback to `mock`.
+4. **Critic** — fast-path denylist (`panic(`, `std.process.Child`, `@cImport(`) + LLM `APPROVE`/`REJECT` with reason; a `REJECT` regenerates the step.
+5. **Evaluator** — compile + run the composed `gen_final.zig`; on failure, store the error and let the engine self-correct.
+6. **Deploy** — commit the verified `gen_final.zig` to an isolated git repo in `workdir`; intermediate `gen_*.zig` are removed.
+7. **Resilience** — per-run failure counter + circuit breaker; on LLM transport error, fallback to `mock`.
 8. **Knowledge** — append structured events to the engine context log.
 9. **Monitoring** — emit token + event metrics.
 
