@@ -71,8 +71,10 @@ Flat imports from `src/`: `@import("core/types.zig")`, not `../core/types.zig`.
   each step emits a `pub fn stepN() void` fragment, the engine merges them under a
   `main` harness, and the evaluator compiles+runs the single artifact. Deploy gates
   on a clean compile+run; one artifact per task, not N disconnected files.
-- Evaluator has no unit test yet: it shells `zig build-exe` and needs a `std.Io` for
-  `std.process.run`. The standalone `std.Io` constructor for tests is unclear in 0.16,
-  so it is verified end-to-end (smoke) instead. Add a test module once that idiom is
-  confirmed.
+- Evaluator has a regression test (`src/evaluator/evaluator.zig`): a compiling
+  program is accepted and a non-compiling one is rejected, via a real
+  `zig build-exe` + run using the pre-initialized `std.Io.Threaded.global_single_threaded`
+  host Io (avoids allocating an Io, which would panic under `zig build test`'s
+  failing-allocator re-run). `src/tests.zig` is the test root, so `zig build test`
+  covers cache, evaluator, and engine composition — not just the cache.
 - `.gitignore` covers binaries, build dirs, `gen_*.zig`, `.yuxi_cache`, `/ae_out/`.
