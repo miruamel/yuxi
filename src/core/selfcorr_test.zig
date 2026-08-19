@@ -135,6 +135,9 @@ test "engine.run blocks dangerous constructs via critic denylist" {
     }
     try std.testing.expect(rejected_denylist);
     try std.testing.expect(!deployed);
+    // New observability counters must reflect the rejection + mock fallback.
+    try std.testing.expect(ctx.critic_rejections >= 1);
+    try std.testing.expect(ctx.mock_fallbacks >= 1);
 }
 
 test "engine.run respects token budget" {
@@ -161,4 +164,6 @@ test "engine.run respects token budget" {
     try std.testing.expect(over);
     try std.testing.expect(!deployed);
     try std.testing.expect(ctx.tokens >= 16); // decomposer call spent tokens
+    // New observability counter must reflect the budget abort.
+    try std.testing.expect(ctx.token_budgets_exceeded >= 1);
 }
