@@ -8,6 +8,7 @@ pub const Config = struct {
     workdir: []const u8,
     cache_path: ?[]const u8,
     expect: ?[]const u8,
+    max_tokens: ?usize,
 };
 
 pub fn parse(gpa: std.mem.Allocator, io: std.Io, args: *std.process.Args.Iterator) !Config {
@@ -18,6 +19,7 @@ pub fn parse(gpa: std.mem.Allocator, io: std.Io, args: *std.process.Args.Iterato
     var workdir: []const u8 = "ae_out";
     var cache_path: ?[]const u8 = null;
     var expect: ?[]const u8 = null;
+    var max_tokens: ?usize = null;
 
     _ = args.next(); // argv[0]
     while (args.next()) |arg| {
@@ -31,6 +33,8 @@ pub fn parse(gpa: std.mem.Allocator, io: std.Io, args: *std.process.Args.Iterato
             cache_path = ".yuxi_cache";
         } else if (std.mem.startsWith(u8, arg, "--cache=")) {
             cache_path = arg["--cache=".len..];
+        } else if (std.mem.eql(u8, arg, "--max-tokens")) {
+            if (args.next()) |m| max_tokens = std.fmt.parseUnsigned(usize, m, 10) catch null;
         } else if (std.mem.eql(u8, arg, "-h") or std.mem.eql(u8, arg, "--help")) {
             printHelp(io);
             return error.HelpRequested;
@@ -41,9 +45,9 @@ pub fn parse(gpa: std.mem.Allocator, io: std.Io, args: *std.process.Args.Iterato
         printHelp(io);
         return error.MissingTask;
     };
-    return .{ .mode = mode, .backend = backend, .task = t, .workdir = workdir, .cache_path = cache_path, .expect = expect };
+    return .{ .mode = mode, .backend = backend, .task = t, .workdir = workdir, .cache_path = cache_path, .expect = expect, .max_tokens = max_tokens };
 }
 fn printHelp(io: std.Io) void {
     types.logLine(io, "Yuxi (玉溪): autonomous software evolution engine", .{});
-    types.logLine(io, "yuxi [--hitl|--no-hitl] [--mock|--openai|--local] [--cache[=DIR]] [--out DIR] [--task TEXT] TASK", .{});
+    types.logLine(io, "yuxi [--hitl|--no-hitl] [--mock|--openai|--local] [--max-tokens N] [--cache[=DIR]] [--out DIR] [--task TEXT] [--expect TEXT] TASK", .{});
 }

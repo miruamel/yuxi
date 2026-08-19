@@ -37,6 +37,13 @@ pub fn run(allocator: std.mem.Allocator, io: std.Io, ctx: *types.Ctx, task: []co
     const max_attempts: usize = 3;
     var attempt: usize = 0;
     while (attempt < max_attempts) : (attempt += 1) {
+        if (ctx.max_tokens) |mt| {
+            if (ctx.tokens >= mt) {
+                ctx.record("engine: token budget exceeded");
+                ctx.log("[engine] token budget exceeded ({d} >= {d}); aborting build", .{ ctx.tokens, mt });
+                break;
+            }
+        }
         for (fragments.items) |f| allocator.free(f);
         fragments.clearRetainingCapacity();
         var composed = true;

@@ -23,6 +23,7 @@ pub fn main(init: std.process.Init) !void {
 
     var ctx = try types.Ctx.init(arena, io, init.minimal.environ, cfg.mode, cfg.backend, key, base, cfg.workdir);
     ctx.expected = cfg.expect;
+    ctx.max_tokens = cfg.max_tokens;
     ctx.cache = blk: {
         const cp = cfg.cache_path orelse break :blk null;
         const c = arena.create(cache_mod.Cache) catch break :blk null;

@@ -136,3 +136,29 @@ test "engine.run blocks dangerous constructs via critic denylist" {
     try std.testing.expect(rejected_denylist);
     try std.testing.expect(!deployed);
 }
+
+test "engine.run respects token budget" {
+    // `transport.complete` adds >=16 tokens per call (user.len/4 + system.len/8 + 16),
+    // so a tiny budget is exceeded by the decomposer alone. With `--max-tokens 1`
+    // the engine must abort the build loop before deploying, recording the
+    // budget-exceeded event. Uses the real (mock) backend to exercise the
+    // counting path in transport.complete, not the seam.
+    const allocator = std.heap.page_allocator;
+    const io = std.Io.Threaded.global_single_threaded.io();
+    const workdir = "/tmp/yuxi_budget_test";
+    try fs.ensureDir(allocator, workdir);
+
+    var ctx = try types.Ctx.init(allocator, io, .empty, .no_hitl, .mock, null, "", workdir);
+    ctx.max_tokens = 1;
+    try engine.run(allocator, io, &ctx, "design a calculator");
+
+    var over = false;
+    var deployed = false;
+    for (ctx.events.items) |e| {
+        if (std.mem.indexOf(u8, e, "engine: token budget exceeded") != null) over = true;
+        if (std.mem.indexOf(u8, e, "deploy: committed") != null) deployed = true;
+    }
+    try std.testing.expect(over);
+    try std.testing.expect(!deployed);
+    try std.testing.expect(ctx.tokens >= 16); // decomposer call spent tokens
+}

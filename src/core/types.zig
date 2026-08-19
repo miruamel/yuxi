@@ -23,6 +23,7 @@ pub const Ctx = struct {
     llm_base: []const u8,
     workdir: []const u8,
     tokens: usize,
+    max_tokens: ?usize,
     cache: ?*cache_mod.Cache,
     eval_error: ?[]const u8,
     /// Optional caller-supplied expected stdout (trimmed) for behavioral
@@ -48,6 +49,7 @@ pub const Ctx = struct {
             .llm_base = base,
             .workdir = workdir,
             .tokens = 0,
+            .max_tokens = null,
             .cache = null,
             .eval_error = null,
             .failures = 0,

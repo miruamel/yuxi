@@ -36,6 +36,11 @@ tracked history by capability; commit hashes reference `git log`.
   Used to add an engine-level integration test proving the self-correction
   loop recovers from a broken first build (fail first code-gen, then succeed).
 
+- **Token/cost budget cap** — `feat:` `--max-tokens N` sets a soft ceiling on
+  LLM spend (`ctx.max_tokens`); `engine.run` aborts the build loop once
+  `ctx.tokens` (counted per completion in `transport.complete`) reaches it,
+  recording `engine: token budget exceeded` and deploying nothing. Default off.
+
 ## Engineering
 
 - **Resilience state per-run** — `808a469`. `failures` moved from a module-level
