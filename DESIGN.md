@@ -26,7 +26,7 @@ pass; a rejected `Critic` triggers one retry via `Resilience` fallback before
    before write when `mode == hitl`.
 4. **Critic** — fast-path rules (rejects `panic(`) + LLM `APPROVE`/`REJECT`.
 5. **Evaluator** — `zig ast-check` compile gate per file.
-6. **Deploy** — `git add <path>` + `git commit` on stable (guarded).
+6. **Deploy** — isolated git repo in `workdir`; `git -C {wd} add` + `git commit` per stable file (best-effort).
 7. **Resilience** — circuit breaker; on LLM failure, fallback to `mock`.
 8. **Knowledge** — append structured events to the engine context log.
 9. **Monitoring** — emit token + event metrics.
@@ -47,7 +47,7 @@ All HTTP backends use `curl` via `std.process.run`.
 ## Run
 
 ```bash
-zig build-exe src/main.zig -femit-bin=yuxi
-./yuxi --no-hitl --mock --task "write a function that adds two ints"
-./yuxi --hitl   --local  --task "..."      # pauses for y/N before write
+/opt/zig/zig build                 # produces zig-out/bin/yuxi
+./zig-out/bin/yuxi --no-hitl --mock --task "write a function that adds two ints"
+./zig-out/bin/yuxi --hitl   --local  --task "..."      # pauses for y/N before write
 ```

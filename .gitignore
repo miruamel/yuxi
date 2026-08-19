@@ -4,6 +4,8 @@
 *.o
 zig-out/
 zig-cache/
+/ae_out/
+
 .zig-cache/
 
 # generated during runs
