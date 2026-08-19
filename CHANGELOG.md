@@ -43,3 +43,10 @@ tracked history by capability; commit hashes reference `git log`.
 - **Repo hygiene** — `15cedc5` moved `AGENTS.Style.md` into the repo so it
   co-locates with `AGENTS.md`; `DESIGN.md` and `README.md` document the current
   pipeline.
+
+## Repository
+
+- **CI fixed** — `.github/workflows/ci.yml` referenced a nonexistent action
+  slug (`goto-bus/setup-zig`); switched to the maintained `mlugg/setup-zig@v4`
+  so the Zig 0.16.0 toolchain actually installs and the build/test/format
+  gates run on push and PR.
