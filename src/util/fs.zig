@@ -47,3 +47,8 @@ pub fn ensureDir(alloc: std.mem.Allocator, dir: []const u8) !void {
         if (e != .SUCCESS and e != .EXIST) return error.DirCreateFailed;
     }
 }
+/// Remove a single file. Fails (does not panic) if the path is a directory
+/// or the syscall is rejected; callers decide whether a missing file is fatal.
+pub fn deleteFile(io: std.Io, path: []const u8) !void {
+    return std.Io.Dir.deleteFile(std.Io.Dir.cwd(), io, path);
+}

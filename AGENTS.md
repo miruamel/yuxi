@@ -41,6 +41,9 @@ because the spawned `git` inherits no identity in this env.
 **Gating:** `engine.zig` only calls `deploy.run` when `evaluator.run`
 (`zig build-exe` compile + run) returns true. Invalid output is never committed and no
 workdir repo is created.
+- **Cleanup:** after a successful deploy, per-step `gen_{i}.zig` fragments are
+  deleted (best-effort) so only `gen_final.zig` remains in `ctx.workdir`.
+  On evaluation failure the intermediates are kept for debugging.
 
 ## Smoke test & gotchas
 End-to-end check, offline (no API key):

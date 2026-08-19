@@ -75,6 +75,12 @@ pub fn run(allocator: std.mem.Allocator, io: std.Io, ctx: *types.Ctx, task: []co
         const verified = try evaluator.run(ctx, merged_path);
         if (verified) {
             _ = try deploy.run(ctx, merged_path);
+            // Per-step fragments are now redundant with the composed artifact.
+            for (steps.items, 0..) |_, i| {
+                const p = try std.fmt.allocPrint(allocator, "{s}/gen_{d}.zig", .{ ctx.workdir, i });
+                defer allocator.free(p);
+                fs.deleteFile(io, p) catch |e| ctx.log("[engine] keep gen_{d}: {s}", .{ i, @errorName(e) });
+            }
         } else {
             ctx.log("[engine] composition not deployed (evaluation failed)", .{});
         }
@@ -127,4 +133,37 @@ test "compose merges step fragments with a main harness" {
     try std.testing.expect(std.mem.indexOf(u8, prog, "pub fn main() void {") != null);
     try std.testing.expect(std.mem.indexOf(u8, prog, "    _ = step0();") != null);
     try std.testing.expect(std.mem.indexOf(u8, prog, "    _ = step1();") != null);
+}
+
+test "engine.run removes intermediate step files, keeps gen_final" {
+    // Integration test: the mock backend yields a full, self-contained
+    // pipeline (orchestrator -> 3 steps, builder -> stepN fns, critic -> APPROVE).
+    // Uses page_allocator because engine.run intentionally leaves exit-time
+    // allocations (ctx.events, steps) for the CLI, which the test allocator
+    // would otherwise report as leaks.
+    const allocator = std.heap.page_allocator;
+    const io = std.Io.Threaded.global_single_threaded.io();
+    const workdir = "/tmp/yuxi_clean_test";
+    try fs.ensureDir(allocator, workdir);
+
+    var ctx = try types.Ctx.init(allocator, io, .empty, .no_hitl, .mock, null, "", workdir);
+    try run(allocator, io, &ctx, "design a calculator");
+
+    const final_path = try std.fmt.allocPrint(allocator, "{s}/gen_final.zig", .{workdir});
+    defer allocator.free(final_path);
+    try std.testing.expect(fileExists(final_path));
+    for (0..3) |i| {
+        const p = try std.fmt.allocPrint(allocator, "{s}/gen_{d}.zig", .{ workdir, i });
+        defer allocator.free(p);
+        try std.testing.expect(!fileExists(p));
+    }
+}
+
+fn fileExists(path: []const u8) bool {
+    const fd = std.posix.openat(std.posix.AT.FDCWD, path, std.posix.O{ .ACCMODE = .RDONLY }, 0) catch |e| {
+        if (e == error.FileNotFound) return false;
+        return true;
+    };
+    std.os.linux.close(fd);
+    return true;
 }
