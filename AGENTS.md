@@ -85,6 +85,17 @@ passes and `--expect "nope"` triggers the retry path.
   `<workdir>/<idx>`; `fs.ensureDir` now creates the missing parent, so a
   fresh workdir no longer fails with `DirCreateFailed`.
 
+## Knowledge base (feat)
+`--kb[=DIR]` enables a persistent lesson ledger the engine learns from across
+runs — the core autonomous-evolution loop. Each run appends one line to `<DIR>`
+(default file `kb.md` when `--kb` is given without `=`), recording the task,
+outcome (deployed/failed), step count, deploys, and retries; the orchestrator
+prepends prior lessons to its decomposition prompt so later runs avoid
+repeating failures. Opt-in and off by default (`Ctx.kb_path = null`): with
+`--kb` unset no file I/O occurs and every existing test/pipeline path is
+unchanged. The mock backend ignores injected context, so prompt shape never
+affects mock output (and the engine test stays green).
+
 ## Run metrics (observability, feat)
 `Ctx` carries five autonomy-health counters incremented at their event
 sites: `critic_rejections`, `mock_fallbacks`, `retries` (self-correction
@@ -147,6 +158,7 @@ Flat imports from `src/`: `@import("core/types.zig")`, not `../core/types.zig`.
 - `.gitignore` covers binaries, build dirs, `gen_*.zig`, `.yuxi_cache`, `/ae_out/`.
 
 ## Recent cycles (category balance, §14)
+- `fac5fa4` feat: persistent knowledge base (--kb) learns lessons across runs (§11/§12).
 - `3a16e4d` feat: batch task execution via --tasks (loop.runTasks: per-task workdir + batch health report).
 - `d759878` fix: ensureDir creates nested parent dirs (unbreaks --tasks workdir; was DirCreateFailed).
 - `eef6a4f` fix: mock emits single-line output so --expect matches (was tripled by 3-step compose).
