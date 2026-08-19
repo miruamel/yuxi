@@ -161,6 +161,7 @@ Flat imports from `src/`: `@import("core/types.zig")`, not `../core/types.zig`.
 - `d1c7cc0` feat: enrich knowledge-base lessons with degradation counters (§12).
 - `3a16e4d` feat: batch task execution via --tasks (loop.runTasks: per-task workdir + batch health report).
 - `d759878` fix: ensureDir creates nested parent dirs (unbreaks --tasks workdir; was DirCreateFailed).
+- `0ea3f5a` test: cover LLM-critic REJECT recovery branch (step.zig 23-47) via injected backend; complements denylist fallback test (§11/§21).
 - `eef6a4f` fix: mock emits single-line output so --expect matches (was tripled by 3-step compose).
 - `8b62080` feat: structured run metrics for autonomy health (§30/§32).
 - `1ae73b6` feat: end-of-run autonomy-health verdict consumes run metrics (§30/§32).
