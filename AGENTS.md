@@ -32,11 +32,43 @@ sha256(backend \0 system \0 user) and serves prior responses from disk without
 re-calling the model. Opt-in; default dir `.yuxi_cache`. Cache hits also skip the
 `ctx.tokens` increment, so monitoring reports real generation cost.
 
+## Deploy layer (verified checkpoint)
+Each generated `gen_N.zig` is committed into an *isolated* git repo inside
+`ctx.workdir` (default `ae_out/`) via `deploy.run`: `git -C <wd> init` + add
++ commit. Keeps engine-run artifacts out of the engine repo. Commits use an
+explicit identity (`git -c user.name=Yuxi Engine -c user.email=yuxi@localhost`)
+because the spawned `git` inherits no identity in this env.
+**Gating:** `engine.zig` only calls `deploy.run` when `evaluator.run`
+(`zig ast-check`) returns true. Invalid output is never committed and no
+workdir repo is created.
+
+## Smoke test & gotchas
+End-to-end check, offline (no API key):
+```bash
+/opt/zig/zig build-exe src/main.zig -femit-bin=/tmp/yuxi_bin -O Debug
+rm -rf /tmp/smoke && mkdir -p /tmp/smoke && cd /tmp/smoke
+/tmp/yuxi_bin --no-hitl --mock --cache --task "add two numbers"
+git -C ae_out log --oneline      # expect 3 commits (mock emits valid Zig)
+```
+Gotchas paid for this cycle:
+- **Rebuild the /tmp binary after every source edit.** `zig build-exe` is not
+  watched; smoking a stale binary wasted a cycle (the deploy-identity fix was
+  hidden behind a pre-edit binary once).
+- **`rm -rf ae_out` can fail EACCES on `.git/objects`** (Android overlay fs).
+  Use a fresh smoke dir instead of `rm`.
+- **Spawned `git` has no identity here** — rely on the `-c` flags, never
+  assume global `user.name/email` exists.
+
+
 ## Invariants (from DESIGN.md)
 <=5 files/dir, <=200 SLOC/file, deep nesting by capability.
 Flat imports from `src/`: `@import("core/types.zig")`, not `../core/types.zig`.
 
 ## Known gaps (next cycles)
-- CI workflow added (.github/workflows/ci.yml) but needs a remote to actually run.
-- Git repo initialized (initial commit eacb0ca); `.gitignore` covers binaries
-  (`yuxi`, `ae`), build dirs (`zig-out/`, `zig-cache/`), `gen_*.zig`, `.yuxi_cache`.
+- Remote `miruamel/Xunma` is 404; no push/release until a remote is provisioned
+  (CI workflow exists but cannot run without one).
+- Evaluator only runs `zig ast-check` (syntax); semantic/type errors pass the
+  gate. A full compile+run of the generated module is still missing.
+- Generated `gen_N.zig` are standalone snippets; the engine does not yet compose
+  them into one buildable, runnable artifact (real evolution output).
+- `.gitignore` covers binaries, build dirs, `gen_*.zig`, `.yuxi_cache`, `/ae_out/`.
