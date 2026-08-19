@@ -131,6 +131,7 @@ Flat imports from `src/`: `@import("core/types.zig")`, not `../core/types.zig`.
 - `.gitignore` covers binaries, build dirs, `gen_*.zig`, `.yuxi_cache`, `/ae_out/`.
 
 ## Recent cycles (category balance, §14)
+- `da06e74` refactor: extract step build into src/core/step.zig (§8 SLOC cap).
 - `ff96295` feat: token/cost budget cap (`--max-tokens`).
 - `d60859b` test: engine-level critic denylist integration test (via `Ctx.llm_fn` seam).
 - `9b58ab0` ci: fixed broken `goto-bus/setup-zig` → `mlugg/setup-zig@v2`.
