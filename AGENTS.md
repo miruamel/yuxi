@@ -170,6 +170,7 @@ Flat imports from `src/`: `@import("core/types.zig")`, not `../core/types.zig`.
 - `.gitignore` covers binaries, build dirs, `gen_*.zig`, `.yuxi_cache`, `/ae_out/`.
 
 ## Recent cycles (category balance, §14)
+- `7ae51bc` refactor: split core/selfcorr_test.zig (241 SLOC, §8 breach) into core/selfcorr/{recovery,gate}_test.zig; deepens nesting, frees core/ 5-file cap (§8/§9).
 - `5521d48` feat: offline replay mode (--replay) drives real .openai/.local backend path offline for CI/tests (§11/§21).
 - `fac5fa4` feat: persistent knowledge base (--kb) learns lessons across runs (§11/§12).
 - `d1c7cc0` feat: enrich knowledge-base lessons with degradation counters (§12).

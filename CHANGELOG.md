@@ -51,6 +51,22 @@ tracked history by capability; commit hashes reference `git log`.
   rebuilds), `deploys`, `token_budgets_exceeded` — incremented at their event
   sites and emitted by `monitoring.report`, so the loop can read its own
   effectiveness without parsing event strings.
+- **Batch task execution (`--tasks`)** — `3a16e4d`. `loop.runTasks` runs several
+  tasks, each in its own workdir, and prints a health report rather than stopping
+  at the first failure.
+- **Persistent knowledge base (`--kb`)** — `fac5fa4`. Each run appends one line to
+  `<DIR>/lessons`: outcome (deployed/failed) plus degradation counters
+  (`critic_rejections`, `mock_fallbacks`, `token_budgets_exceeded`) and step/deploy/
+  retry counts. Prior lessons are prepended to the decomposer prompt so later runs
+  avoid repeating failures. Off by default (`Ctx.kb_path = null`).
+- **Knowledge-base enrichment** — `d1c7cc0`. Lesson lines now carry the degradation
+  counters above plus step/deploy/retry counts, so the ledger captures not just
+  what failed but how degraded the run was.
+- **Offline replay mode (`--replay`)** — `5521d48`. `transport.complete` serves
+  recorded LLM responses in call order (file entries split by a line that is
+  exactly `---`) when the backend is `.openai`/`.local` and `Ctx.replay_path` is
+  set, exercising the real dispatch — including curl auth and response handling —
+  offline with no API key, for CI and integration tests. Off by default.
 
 ## Engineering
 
@@ -66,6 +82,17 @@ tracked history by capability; commit hashes reference `git log`.
   `critic: rejected (denylist)` and never deploys (`deploy: committed` absent).
   Exercises the §19 security gate end-to-end through the real engine, not just
   the isolated `critic.run` unit test; uses the `Ctx.llm_fn` seam (no network).
+- **LLM-critic REJECT recovery test** — `0ea3f5a`. Engine-level integration test
+  (`engine.run recovers from an LLM-critic REJECT via regenerate`) injects a backend
+  that rejects the first critic call then approves, proving the regenerate-on-REJECT
+  recovery branch (step.zig 23-47) via the `Ctx.llm_fn` seam; complements the
+  denylist fallback test.
+- **Fix: `ensureDir` creates nested parents** — `d759878`. `util/fs.ensureDir` now
+  recurses to create intermediate directories, unbreaking `--tasks` per-task
+  workdirs (previously `DirCreateFailed`).
+- **Fix: mock emits single-line output** — `eef6a4f`. The mock backend now emits a
+  single-line function body so `--expect` stdout matches (was tripled by the
+  3-step compose).
 
 ## Repository
 
