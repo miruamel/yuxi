@@ -1,0 +1,64 @@
+# Yuxi (玉溪) — Autonomous Software Evolution Engine
+
+A Zig 0.16 orchestrator that takes a task, decomposes it into steps with an LLM,
+generates Zig code per step, critiques and self-corrects it, compiles and runs
+it, and deploys the verified result. Selectable HITL / non-HITL. The "brain" is
+an external LLM (OpenAI-compatible or a local Ollama/llama.cpp server); `mock`
+runs fully offline for development and testing.
+
+## Build & Run
+
+```bash
+/opt/zig/zig build                 # -> zig-out/bin/yuxi
+/opt/zig/zig build test            # unit + integration tests
+/opt/zig/zig fmt --check src       # formatting gate
+
+./zig-out/bin/yuxi --no-hitl --mock --task "add two numbers"
+./zig-out/bin/yuxi --hitl   --local --task "..."   # pauses y/N before each write
+```
+
+Flags: `--mock|--openai|--local`, `--hitl|--no-hitl`, `--task TEXT`,
+`--out DIR`, `--cache[=DIR]`. Environment: `OPENAI_API_KEY` / `OPENAI_BASE`,
+`LOCAL_BASE`, `AE_TOKEN` (optional gateway auth token).
+
+## Pipeline
+
+```
+Gateway -> Orchestrator -> (Builder -> Critic)* -> Compose -> Evaluator -> Deploy
+                                          ^                          |
+                                          \________ Resilience <- Knowledge <- Monitoring
+```
+
+- **Gateway** — optional token auth, rate-limit, task validation, PII
+  sanitizer (naive `@` redaction), intent router.
+- **Orchestrator** — LLM decomposer -> numbered `STEP:` plan; falls back to a
+  single step equal to the task when the LLM returns no steps.
+- **Builder** — per step, the LLM emits one `stepN() void` function. On
+  evaluation failure the compiler/run error is fed back as builder feedback for
+  the next attempt (self-correction).
+- **Critic** — fast-path denylist (rejects `panic(`, `std.process.Child`,
+  `@cImport(`) plus an LLM `APPROVE`/`REJECT` verdict. A `REJECT` regenerates
+  *that* step with the critic's reason as builder feedback (no global backend
+  downgrade).
+- **Compose** — merge all step fragments into one `gen_final.zig` with a `main`
+  harness that calls each `stepN()`.
+- **Evaluator** — compile **and run** `gen_final.zig`. On failure the error is
+  stored and the whole pipeline rebuilds (up to 3 attempts) with feedback.
+- **Deploy** — commit `gen_final.zig` to an isolated git repo in `workdir`;
+  intermediate `gen_*.zig` files are removed afterward.
+- **Resilience** — per-run failure counter and circuit breaker (falls back to
+  `mock` on an LLM transport error).
+- **Knowledge / Monitoring** — structured event log and runtime metrics
+  (events, tokens, backend, cache hits/misses).
+
+## Safety
+
+Generated code is reviewed by the critic before it runs. A static denylist
+blocks arbitrary process spawn (`std.process.Child`) and native C interop
+(`@cImport`) so the engine never executes generated code that could shell out or
+link native. HITL mode gates every file write.
+
+## Repository invariants
+
+≤5 files per directory, ≤200 SLOC per file, deep nesting by capability. See
+`DESIGN.md` for the layer sketch and `AGENTS.md` for agent-facing conventions.
