@@ -1,9 +1,8 @@
 const std = @import("std");
 const types = @import("types.zig");
+const buildstep = @import("step.zig");
 const gateway = @import("../gateway/gateway.zig");
 const orchestrator = @import("../orchestrator/orchestrator.zig");
-const builder = @import("../builder/builder.zig");
-const critic = @import("../critic/critic.zig");
 const evaluator = @import("../evaluator/evaluator.zig");
 const deploy = @import("../deploy/deploy.zig");
 const resilience = @import("../resilience/resilience.zig");
@@ -48,7 +47,7 @@ pub fn run(allocator: std.mem.Allocator, io: std.Io, ctx: *types.Ctx, task: []co
         fragments.clearRetainingCapacity();
         var composed = true;
         for (steps.items, 0..) |*step, i| {
-            const frag = try buildStep(allocator, ctx, step, i, if (attempt == 0) null else feedback);
+            const frag = try buildstep.build(allocator, ctx, step, i, if (attempt == 0) null else feedback);
             if (frag == null) {
                 composed = false;
                 break;
@@ -164,43 +163,4 @@ pub fn fileExists(path: []const u8) bool {
     };
     std.os.linux.close(fd);
     return true;
-}
-/// Build one step (Builder -> Critic). A critic rejection regenerates THIS step
-/// with the critic's reason as builder feedback (no global backend downgrade);
-/// only a still-rejected retry falls back to mock. `feedback` seeds the first build.
-fn buildStep(allocator: std.mem.Allocator, ctx: *types.Ctx, step: *types.Step, i: usize, feedback: ?[]const u8) !?[]const u8 {
-    const path = try std.fmt.allocPrint(allocator, "{s}/gen_{d}.zig", .{ ctx.workdir, i });
-    defer allocator.free(path);
-    if (!try builder.run(ctx, step, path, feedback)) {
-        ctx.log("[engine] step {d} not built", .{step.id});
-        return null;
-    }
-    var code = fs.readFileAlloc(allocator, path) catch |e| {
-        ctx.log("[engine] read failed: {s}", .{@errorName(e)});
-        return null;
-    };
-    const v = try critic.run(ctx, code);
-    if (v.ok) {
-        if (v.reason) |r| allocator.free(r);
-        return code;
-    }
-    ctx.log("[engine] critic rejected step {d}: {s}", .{ step.id, v.reason orelse "no reason" });
-    allocator.free(code);
-    const fb = if (v.reason) |r| r else "critic rejected";
-    _ = try builder.run(ctx, step, path, fb);
-    if (v.reason) |r| allocator.free(r);
-    code = fs.readFileAlloc(allocator, path) catch {
-        ctx.log("[engine] read failed after rebuild", .{});
-        return null;
-    };
-    const v2 = try critic.run(ctx, code);
-    if (v2.ok) {
-        if (v2.reason) |r| allocator.free(r);
-        return code;
-    }
-    resilience.fallback(ctx);
-    if (v2.reason) |r| allocator.free(r);
-    allocator.free(code);
-    ctx.log("[engine] step {d} rejected after retry; fallback to mock", .{step.id});
-    return null;
 }
