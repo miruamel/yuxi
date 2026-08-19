@@ -34,3 +34,16 @@ pub fn readFileAlloc(allocator: std.mem.Allocator, path: []const u8) ![]u8 {
     }
     return buf.toOwnedSlice(allocator);
 }
+/// Create `dir` if absent; no-op if it already exists.
+pub fn ensureDir(alloc: std.mem.Allocator, dir: []const u8) !void {
+    var zbuf = try std.ArrayList(u8).initCapacity(alloc, dir.len + 1);
+    try zbuf.appendSlice(alloc, dir);
+    try zbuf.append(alloc, 0);
+    const z: [*:0]u8 = @ptrCast(zbuf.items.ptr);
+    const rc = std.os.linux.mkdir(z, 0o755);
+    alloc.free(zbuf.items);
+    if (rc != 0) {
+        const e = std.posix.errno(rc);
+        if (e != .SUCCESS and e != .EXIST) return error.DirCreateFailed;
+    }
+}

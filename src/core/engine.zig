@@ -14,6 +14,7 @@ const fs = @import("../util/fs.zig");
 pub fn run(allocator: std.mem.Allocator, io: std.Io, ctx: *types.Ctx, task: []const u8) !void {
     types.logLine(io, "=== Yuxi (玉溪): autonomous software evolution engine ===", .{});
     types.logLine(io, "[engine] mode={s} backend={s}", .{ @tagName(ctx.mode), @tagName(ctx.backend) });
+    try fs.ensureDir(allocator, ctx.workdir);
 
     // LAYER 1: Gateway
     if (!try gateway.run(ctx, task)) {
@@ -28,7 +29,7 @@ pub fn run(allocator: std.mem.Allocator, io: std.Io, ctx: *types.Ctx, task: []co
     }
     // LAYER 3-6: per step (Builder -> Critic -> Evaluator -> Deploy)
     for (steps.items, 0..) |*step, i| {
-        const path = try std.fmt.allocPrint(allocator, "gen_{d}.zig", .{i});
+        const path = try std.fmt.allocPrint(allocator, "{s}/gen_{d}.zig", .{ ctx.workdir, i });
         if (!try builder.run(ctx, step, path)) {
             ctx.log("[engine] step {d} not built", .{step.id});
             allocator.free(path);
