@@ -18,6 +18,10 @@ evolution engine described in `DESIGN.md`.
 - `--out DIR` — workdir (default `ae_out/`); isolated git repo lives here.
 - `--cache[=DIR]` — opt-in on-disk LLM-response cache (default `.yuxi_cache`).
 - --replay[=FILE] — opt-in recorded-LLM-response file; `transport.complete` serves entries in call order for `.openai`/`.local` without calling the network (offline CI/tests). Entries delimited by `---` lines.
+- `--record[=FILE]` — opt-in capture of every real (non-seam, non-replay) LLM
+  response into a file; `engine.run` flushes them as `--replay`-compatible
+  entries (delimited by `---` lines). Default file `.yuxi_record.txt`. Pair
+  with `--replay` to record a run once, then drive it offline forever.
 - `--expect TEXT` — behavioral verification (see below).
 - `--max-tokens N` — soft LLM-spend ceiling; `engine.run` aborts the build loop
   once `ctx.tokens` reaches N, records `engine: token budget exceeded`, deploys
@@ -56,6 +60,10 @@ dispatch — including curl auth, response handling, and the full engine loop �
 offline, with no API key, for CI and integration tests. `transport_test.zig`
 covers ordered playback (unit) and a full `engine.run` deploy through the
 real openai path via replay.
+- **Record/replay loop (feat):** `--record` writes a transcript that `--replay`
+  consumes verbatim, so a single real (or mock) run can be replayed through the
+  real `.openai`/`.local` dispatch offline with no API key. `transport_test.zig`
+  proves the round-trip end-to-end (mock capture -> offline replay deploy).
 
 ## Deploy layer (verified checkpoint)
 The composed `gen_final.zig` (one per task) is committed into an *isolated* git repo inside
@@ -170,6 +178,7 @@ Flat imports from `src/`: `@import("core/types.zig")`, not `../core/types.zig`.
 - `.gitignore` covers binaries, build dirs, `gen_*.zig`, `.yuxi_cache`, `/ae_out/`.
 
 ## Recent cycles (category balance, §14)
+- `74d93fd` feat: offline record mode (--record) captures a --replay-compatible transcript; closes the record/replay loop (§12).
 - `7ae51bc` refactor: split core/selfcorr_test.zig (241 SLOC, §8 breach) into core/selfcorr/{recovery,gate}_test.zig; deepens nesting, frees core/ 5-file cap (§8/§9).
 - `5521d48` feat: offline replay mode (--replay) drives real .openai/.local backend path offline for CI/tests (§11/§21).
 - `fac5fa4` feat: persistent knowledge base (--kb) learns lessons across runs (§11/§12).

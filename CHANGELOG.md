@@ -67,6 +67,11 @@ tracked history by capability; commit hashes reference `git log`.
   exactly `---`) when the backend is `.openai`/`.local` and `Ctx.replay_path` is
   set, exercising the real dispatch — including curl auth and response handling —
   offline with no API key, for CI and integration tests. Off by default.
+- **Offline record mode (`--record`)** — `74d93fd`. `engine.run` flushes every
+  real (non-seam, non-replay) completion into `Ctx.recorded` and writes them as
+  `--replay`-compatible entries (delimited by `---` lines), so a single run can
+  be replayed through the real `.openai`/`.local` dispatch offline with no API
+  key. Closes the record/replay loop.
 
 ## Engineering
 
