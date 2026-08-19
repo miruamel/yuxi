@@ -46,6 +46,14 @@ pub const Ctx = struct {
     replay_path: ?[]const u8 = null,
     /// Position into the replay file (next entry to serve). Offline-only state.
     replay_idx: usize = 0,
+    /// Optional path to write recorded LLM responses. When set, each real
+    /// (non-seam, non-replay) completion is captured into `recorded` and flushed
+    /// to this file at the end of engine.run, producing a `--replay`-compatible
+    /// transcript (entries delimited by a line that is exactly `---`). Null by
+    /// default.
+    record_path: ?[]const u8 = null,
+    /// Captured responses for the current run, flushed to `record_path` on exit.
+    recorded: std.ArrayList([]const u8),
     failures: usize,
     critic_rejections: usize,
     mock_fallbacks: usize,
@@ -76,6 +84,7 @@ pub const Ctx = struct {
             .token_budgets_exceeded = 0,
             .expected = null,
             .llm_fn = null,
+            .recorded = try std.ArrayList([]const u8).initCapacity(allocator, 0),
             .events = try std.ArrayList([]const u8).initCapacity(allocator, 0),
         };
     }

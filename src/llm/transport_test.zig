@@ -91,3 +91,29 @@ test "engine.run drives the real openai backend offline via --replay" {
     try std.testing.expectEqual(ctx.critic_rejections, 0);
     try std.testing.expectEqual(ctx.mock_fallbacks, 0);
 }
+
+test "engine.run records a replay-compatible transcript (mock capture -> offline replay)" {
+    // Capture a real run's completions (mock backend) into a file, then drive
+    // the real .openai backend path OFFLINE through that transcript. Deploys
+    // again with zero API key / network => --record produced --replay-compatible
+    // output, closing the record/replay loop end-to-end.
+    const allocator = std.heap.page_allocator;
+    const io = std.Io.Threaded.global_single_threaded.io();
+    const rec_path = "/tmp/yuxi_record_e2e.txt";
+    const workdir = "/tmp/yuxi_record_run";
+    fs.deleteFile(io, rec_path) catch {};
+    try fs.ensureDir(allocator, workdir);
+
+    var ctx1 = try types.Ctx.init(allocator, io, .empty, .no_hitl, .mock, null, "", workdir);
+    ctx1.record_path = rec_path;
+    try engine.run(allocator, io, &ctx1, "design a calculator");
+    try std.testing.expect(ctx1.deploys >= 1);
+    try std.testing.expect(engine.fileExists(rec_path));
+
+    var ctx2 = try types.Ctx.init(allocator, io, .empty, .no_hitl, .openai, null, "", workdir);
+    ctx2.replay_path = rec_path;
+    try engine.run(allocator, io, &ctx2, "design a calculator");
+    try std.testing.expect(ctx2.deploys >= 1);
+    try std.testing.expectEqual(ctx2.critic_rejections, 0);
+    try std.testing.expectEqual(ctx2.mock_fallbacks, 0);
+}

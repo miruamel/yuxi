@@ -15,6 +15,7 @@ const cache_mod = @import("../util/cache.zig");
 pub fn run(allocator: std.mem.Allocator, io: std.Io, ctx: *types.Ctx, task: []const u8) !void {
     types.logLine(io, "=== Yuxi (玉溪): autonomous software evolution engine ===", .{});
     types.logLine(io, "[engine] mode={s} backend={s}", .{ @tagName(ctx.mode), @tagName(ctx.backend) });
+    defer flushRecord(allocator, ctx);
     try fs.ensureDir(allocator, ctx.workdir);
 
     // LAYER 1: Gateway
@@ -104,6 +105,24 @@ pub fn run(allocator: std.mem.Allocator, io: std.Io, ctx: *types.Ctx, task: []co
     monitoring.assessHealth(ctx);
     types.logLine(io, "[engine] done. events={d}", .{ctx.events.items.len});
 }
+
+/// Flush captured LLM responses (Ctx.recorded) to Ctx.record_path as a
+/// `--replay`-compatible transcript. No-op unless record_path is set and at
+/// least one response was captured. Called via `defer` at the end of run so
+/// every exit path (including early aborts) writes the transcript.
+fn flushRecord(allocator: std.mem.Allocator, ctx: *types.Ctx) void {
+    const rp = ctx.record_path orelse return;
+    if (ctx.recorded.items.len == 0) return;
+    var buf = std.ArrayList(u8).initCapacity(allocator, 0) catch return;
+    defer buf.deinit(allocator);
+    for (ctx.recorded.items, 0..) |e, i| {
+        if (i > 0) buf.appendSlice(allocator, "\n---\n") catch {};
+        buf.appendSlice(allocator, e) catch {};
+    }
+    const content = buf.toOwnedSlice(allocator) catch return;
+    defer allocator.free(content);
+    fs.writeFileAlloc(allocator, rp, content) catch |e| ctx.log("[transport] record write failed: {s}", .{@errorName(e)});
+}
 /// Build a run Ctx from parsed Config. `workdir` overrides cfg.workdir so the
 /// multi-task loop can give each task an isolated directory. Backend base URL
 /// and API key resolve from the environment (mirrors main.zig).
@@ -127,6 +146,7 @@ pub fn newCtx(allocator: std.mem.Allocator, io: std.Io, environ: std.process.Env
     };
     ctx.kb_path = cfg.kb_path;
     ctx.replay_path = cfg.replay_path;
+    ctx.record_path = cfg.record_path;
     return ctx;
 }
 /// Merge step fragments into one runnable program: a std import, each step

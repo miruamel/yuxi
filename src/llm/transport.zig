@@ -31,6 +31,10 @@ pub fn complete(allocator: std.mem.Allocator, io: std.Io, ctx: *types.Ctx, syste
     if (ctx.cache) |c| {
         c.put(allocator, @tagName(ctx.backend), system, user, resp) catch {};
     }
+    if (ctx.record_path) |_| {
+        const dup = allocator.dupe(u8, resp) catch null;
+        if (dup) |d| ctx.recorded.append(allocator, d) catch {};
+    }
     return resp;
 }
 
