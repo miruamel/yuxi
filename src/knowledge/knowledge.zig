@@ -62,6 +62,21 @@ pub fn recordLesson(ctx: *types.Ctx, task: []const u8, steps: usize) !void {
         try save(ctx.allocator, kb, lesson);
     }
 }
+/// Persist a qualitative critic-rejection lesson when a KB is configured.
+/// Unlike the numeric summary in `recordLesson`, this captures the *reason*
+/// a step was rejected, so a future run's `injectPrompt` can steer the
+/// decomposer away from the rejected shape — closing the critiqued-shape loop.
+pub fn recordCritic(ctx: *types.Ctx, step_name: []const u8, reason: []const u8) !void {
+    if (ctx.kb_path) |kb| {
+        const lesson = try std.fmt.allocPrint(
+            ctx.allocator,
+            "- critic rejected \"{s}\": {s}",
+            .{ step_name, reason },
+        );
+        defer ctx.allocator.free(lesson);
+        try save(ctx.allocator, kb, lesson);
+    }
+}
 
 /// Build the decomposition user-prompt, prepending prior lessons from the
 /// configured knowledge base when present. Caller owns the returned string.

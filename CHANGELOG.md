@@ -25,6 +25,15 @@ tracked history by capability; commit hashes reference `git log`.
   test, and complete `config.Config` literals (added `--kb`/`--replay`/`--record`
   fields).
 
+### Knowledge base: durable critic lessons (feat)
+- `feat`: the KB now persists **qualitative critic-rejection reasons**, not just
+  the numeric `critic_rej=N` counter. When a critic `REJECT`s a step,
+  `knowledge.recordCritic` appends `- critic rejected "<step>": <reason>` to the
+  KB; `injectPrompt` already prepends the whole KB to future decomposition
+  prompts, so the loop now steers away from rejected shapes across runs. New
+  `recordCritic` unit test plus an end-to-end assertion in `recovery_test.zig`
+  (the reject→regenerate→approve branch) that the reason lands in the KB.
+
 ## v0.1.0 (2026-08-19)
 
 First tagged release of the Yuxi (玉溪) autonomous software-evolution engine,

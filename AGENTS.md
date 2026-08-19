@@ -115,6 +115,9 @@ repeating failures. Opt-in and off by default (`Ctx.kb_path = null`): with
 `--kb` unset no file I/O occurs and every existing test/pipeline path is
 unchanged. The mock backend ignores injected context, so prompt shape never
 affects mock output (and the engine test stays green).
+Critic `REJECT` reasons are now persisted too (`knowledge.recordCritic`), so
+future decompositions can steer away from the rejected shape — not only the
+numeric `critic_rej=N` counter that `recordLesson` records.
 
 ## Run metrics (observability, feat)
 `Ctx` carries five autonomy-health counters incremented at their event

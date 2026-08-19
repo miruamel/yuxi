@@ -79,3 +79,18 @@ test "knowledge recordLesson writes an enriched per-run lesson" {
     try std.testing.expect(std.mem.indexOf(u8, got, "critic_rej=2") != null);
     try std.testing.expect(std.mem.indexOf(u8, got, "mock_fb=1") != null);
 }
+
+test "knowledge recordCritic writes a qualitative lesson" {
+    const alloc = std.testing.allocator;
+    const io = std.Io.Threaded.global_single_threaded.io();
+    const base = "/tmp/yuxi_kb_critic_test";
+    const path = try std.fmt.allocPrint(alloc, "{s}/kb.md", .{base});
+    defer alloc.free(path);
+    defer std.Io.Dir.deleteTree(std.Io.Dir.cwd(), io, base) catch {};
+    var ctx = try types.Ctx.init(alloc, io, .empty, .no_hitl, .mock, null, "", base);
+    ctx.kb_path = path;
+    try knowledge.recordCritic(&ctx, "add error handling", "missing error handling");
+    const got = (try knowledge.load(alloc, path)).?;
+    defer alloc.free(got);
+    try std.testing.expect(std.mem.indexOf(u8, got, "- critic rejected \"add error handling\": missing error handling") != null);
+}

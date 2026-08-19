@@ -2,6 +2,7 @@ const std = @import("std");
 const types = @import("types");
 const fs = @import("fs");
 const engine = @import("engine");
+const knowledge = @import("knowledge");
 
 // Call counter for the injected backend so the test can assert the engine
 // actually retried a failed first build.
@@ -129,6 +130,7 @@ test "engine.run recovers from an LLM-critic REJECT via regenerate" {
     try fs.ensureDir(allocator, workdir);
 
     var ctx = try types.Ctx.init(allocator, io, .empty, .no_hitl, .mock, null, "", workdir);
+    ctx.kb_path = "/tmp/yuxi_reject_recover_test/kb.md";
     ctx.llm_fn = llmRejectThenApprove;
     cg_reject_calls = 0;
     try engine.run(allocator, io, &ctx, "design a calculator");
@@ -146,4 +148,10 @@ test "engine.run recovers from an LLM-critic REJECT via regenerate" {
         defer allocator.free(p);
         try std.testing.expect(!engine.fileExists(p));
     }
+
+    // The critic rejection reason must be persisted as a durable lesson so a
+    // future run's decompose prompt can avoid the rejected shape.
+    const kb = (try knowledge.load(allocator, ctx.kb_path.?)).?;
+    defer allocator.free(kb);
+    try std.testing.expect(std.mem.indexOf(u8, kb, "critic rejected") != null);
 }
