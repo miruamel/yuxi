@@ -7,12 +7,33 @@ pub const Verdict = struct {
     reason: ?[]const u8,
 };
 
+const deny_list = [_][]const u8{
+    "std.process.Child",
+    "@cImport(",
+};
+/// Return an owned reason if `code` contains a construct that must never run
+/// (arbitrary process spawn or native C interop). Null otherwise.
+fn dangerous(alloc: std.mem.Allocator, code: []const u8) !?[]const u8 {
+    for (deny_list) |pat| {
+        if (std.mem.indexOf(u8, code, pat) != null) {
+            return try std.fmt.allocPrint(alloc, "blocked dangerous construct: {s}", .{pat});
+        }
+    }
+    return null;
+}
 pub fn run(ctx: *types.Ctx, code: []const u8) !Verdict {
     // Fast-path rules engine.
     if (std.mem.indexOf(u8, code, "panic(") != null) {
         ctx.log("[critic] fast-path: rejected (contains panic)", .{});
         ctx.record("critic: rejected (panic)");
         return Verdict{ .ok = false, .reason = null };
+    }
+    // Dangerous-construct denylist: block native exec / C interop before the
+    // LLM critic call, so generated code cannot spawn processes or link native.
+    if (try dangerous(ctx.allocator, code)) |reason| {
+        ctx.log("[critic] fast-path: rejected ({s})", .{reason});
+        ctx.record("critic: rejected (denylist)");
+        return Verdict{ .ok = false, .reason = reason };
     }
     // LLM critic. The reason (when present) is owned by the caller.
     const sys = "You are a code critic. Reply APPROVE or REJECT followed by a short reason.";
@@ -63,4 +84,20 @@ test "critic.parseVerdict parses approve/reject with reason" {
     a.free(vr2.reason.?);
     const vd = try parseVerdict(a, "ambiguous text");
     try std.testing.expect(vd.ok);
+}
+test "critic fast-path blocks dangerous constructs" {
+    // page_allocator: run() records events; the testing allocator would flag
+    // those as leaks, so mirror the engine integration test's choice.
+    const allocator = std.heap.page_allocator;
+    const io = std.Io.Threaded.global_single_threaded.io();
+    var ctx = try types.Ctx.init(allocator, io, .empty, .no_hitl, .mock, null, "", "ae_out");
+    const v = try run(&ctx, "pub fn step0() void { const c = std.process.Child.init(&.{\"sh\"}, .{}); }");
+    try std.testing.expect(!v.ok);
+    try std.testing.expect(v.reason != null);
+    try std.testing.expect(std.mem.indexOf(u8, v.reason.?, "std.process.Child") != null);
+    allocator.free(v.reason.?);
+    const v2 = try run(&ctx, "pub fn step1() void { const x = @cImport({ @cInclude(\"x.h\"); }); }");
+    try std.testing.expect(!v2.ok);
+    try std.testing.expect(std.mem.indexOf(u8, v2.reason.?, "@cImport") != null);
+    allocator.free(v2.reason.?);
 }
