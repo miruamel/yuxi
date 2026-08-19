@@ -47,8 +47,12 @@ pub fn run(allocator: std.mem.Allocator, io: std.Io, ctx: *types.Ctx, task: []co
             _ = try builder.run(ctx, step, path);
             approved = try critic.run(ctx, code);
         }
-        _ = try evaluator.run(ctx, path);
-        _ = try deploy.run(ctx, path);
+        const verified = try evaluator.run(ctx, path);
+        if (verified) {
+            _ = try deploy.run(ctx, path);
+        } else {
+            ctx.log("[engine] step {d}: not deployed (evaluation failed)", .{step.id});
+        }
         allocator.free(code);
         allocator.free(path);
     }
