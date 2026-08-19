@@ -4,6 +4,7 @@
 *.o
 zig-out/
 zig-cache/
+.zig-cache/
 
 # generated during runs
 gen_*.zig
