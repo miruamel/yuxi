@@ -18,7 +18,7 @@ runs fully offline for development and testing.
 ```
 
 Flags: `--mock|--openai|--local`, `--hitl|--no-hitl`, `--task TEXT`,
-`--out DIR`, `--cache[=DIR]`, `--expect TEXT`. Environment: `OPENAI_API_KEY` /
+`--out DIR`, `--cache[=DIR]`, `--expect TEXT`, `--max-tokens N`. Environment: `OPENAI_API_KEY` /
 `OPENAI_BASE`, `LOCAL_BASE`, `AE_TOKEN` (optional gateway auth token).
 
 ## Pipeline
@@ -51,7 +51,10 @@ Gateway -> Orchestrator -> (Builder -> Critic)* -> Compose -> Evaluator -> Deplo
 - **Resilience** — per-run failure counter and circuit breaker (falls back to
   `mock` on an LLM transport error).
 - **Knowledge / Monitoring** — structured event log and runtime metrics
-  (events, tokens, backend, cache hits/misses).
+  (events, tokens, backend, cache hits/misses). Per-run autonomy-health
+  counters track `critic_rejections`, `mock_fallbacks`, `retries`,
+  `deploys`, `token_budgets_exceeded` so the loop reads its own effectiveness
+  (§30/§32).
 
 ## Safety
 
