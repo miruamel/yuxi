@@ -12,15 +12,6 @@ pub fn run(ctx: *types.Ctx, task: []const u8) !bool {
     }
     ctx.log("[gateway] auth: ok (token={s})", .{if (tok) |_| "set" else "none"});
 
-    // Rate limit (simple process-local counter).
-    var rl: usize = 0;
-    rl += 1;
-    if (rl > 1000) {
-        ctx.log("[gateway] rate-limit: exceeded", .{});
-        return false;
-    }
-    ctx.log("[gateway] rate-limit: {d}/1000", .{rl});
-
     // Validation.
     if (task.len < 3) {
         ctx.log("[gateway] validation: task too short", .{});
@@ -32,9 +23,6 @@ pub fn run(ctx: *types.Ctx, task: []const u8) !bool {
     defer ctx.allocator.free(clean);
     ctx.log("[gateway] sanitizer: {d} -> {d} bytes", .{ task.len, clean.len });
 
-    // Intent router.
-    const intent = if (std.mem.indexOf(u8, clean, "test") != null) "codegen+test" else "codegen";
-    ctx.log("[gateway] intent: {s}", .{intent});
     ctx.record("gateway: passed");
     return true;
 }

@@ -2,6 +2,22 @@
 
 All notable changes to the Yuxi engine are recorded here. Entries group the
 tracked history by capability; commit hashes reference `git log`.
+## Unreleased
+
+### Engineering / observability
+- `refactor`: removed dead code in `src/gateway/gateway.zig` — the no-op
+  per-process rate-limit (the counter could never exceed 1 in the single-shot
+  CLI) and the unused `intent` variable. Resolves co-owner fork #1 as *remove*.
+- `fix`: `engine.run` no longer logs `"task pipeline complete"` on paths that
+  deploy nothing; the completion line now reflects the actual outcome
+  (deployed vs not).
+
+### Known defect (tracked issue #3)
+- `zig build test` executes **0 tests**. Zig 0.16 collects `test` blocks only
+  from the root module, so the `src/tests.zig` aggregator silently runs
+  nothing. The integration tests listed under v0.1.0 are written but not yet
+  executed. Fix: repo-wide module-name imports + per-file `addTest` roots.
+  Until landed, a green CI run is NOT proof of behavior.
 
 ## v0.1.0 (2026-08-19)
 

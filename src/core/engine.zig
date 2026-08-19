@@ -96,7 +96,11 @@ pub fn run(allocator: std.mem.Allocator, io: std.Io, ctx: *types.Ctx, task: []co
     // LAYER 7: Resilience summary
     resilience.summary(ctx);
     // LAYER 8: Knowledge
-    knowledge.log(ctx, "task pipeline complete");
+    if (verified) {
+        knowledge.log(ctx, "task pipeline complete; artifact deployed");
+    } else {
+        knowledge.log(ctx, "task pipeline finished; nothing deployed");
+    }
     if (ctx.kb_path) |_| {
         knowledge.recordLesson(ctx, task, steps.items.len) catch |e| ctx.log("[knowledge] save failed: {s}", .{@errorName(e)});
     }

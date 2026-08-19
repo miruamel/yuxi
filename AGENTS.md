@@ -155,7 +155,23 @@ Gotchas paid for this cycle:
 <=5 files/dir, <=200 SLOC/file, deep nesting by capability.
 Flat imports from `src/`: `@import("core/types.zig")`, not `../core/types.zig`.
 
+## Test runner (Zig 0.16 limitation)
+`zig build test` currently runs **0 tests**. Zig 0.16 only collects `test`
+blocks from the ROOT module, so `@import`-ing test files from `src/tests.zig`
+does not execute them (verified: root-only collection; imported tests pruned).
+Each test-bearing file must therefore be its own `addTest` root. Sub-directory
+test files (e.g. `src/llm/transport_test.zig`) cannot be roots because their
+`../core/...` imports escape the module path, and `CreateOptions` exposes no
+way to widen it. Fix (issue #3): switch the tree to **module-name imports**
+(`@import("types")`, registered in `build.zig`) so any file can be a root
+anywhere, then add each test file as a `b.addTest` root. Until then the suite
+is vacuous — CI is green but proves nothing. Do NOT trust a green run.
+
 ## Known gaps (next cycles)
+- Gateway rate-limit removed (fork #1 resolved): `main.zig` runs one task then
+  exits, so a per-process counter is unreachable dead code. Removed from
+  `src/gateway/gateway.zig`. Reintroduce a real limiter only if a service mode
+  is added.
 - Remote `miruamel/yuxi` (public) provisioned; `master` pushed, CI green on push to
   `master`/`main`. Release tagging still batched per §28 (no tag cut yet).
 - The engine now composes every step into ONE runnable program (`gen_final.zig`):
