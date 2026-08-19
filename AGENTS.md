@@ -45,6 +45,16 @@ workdir repo is created.
   deleted (best-effort) so only `gen_final.zig` remains in `ctx.workdir`.
   On evaluation failure the intermediates are kept for debugging.
 
+## Self-correction (feat)
+The engine retries the build+compose+evaluate pipeline up to 3 times when
+`evaluator.run` fails. On each failed attempt the compiler/run `stderr` is
+captured on `ctx.eval_error` and fed back into the builder prompt
+(`builder.promptFor`), so an LLM backend (`.openai`/`.local`) can correct
+non-compiling generated code. The mock backend emits deterministic, valid Zig,
+so it always succeeds on attempt 1 and never exercises the retry path.
+On the final failed attempt the intermediates are kept (`gen_*.zig` +
+`gen_final.zig`) for debugging, as before.
+
 ## Smoke test & gotchas
 End-to-end check, offline (no API key):
 ```bash

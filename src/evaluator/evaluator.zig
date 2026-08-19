@@ -25,6 +25,7 @@ pub fn run(ctx: *types.Ctx, path: []const u8) !bool {
     };
     if (!compiled) {
         ctx.log("[evaluator] compile FAILED:\n{s}", .{cres.stderr});
+        ctx.setEvalError(cres.stderr);
         return false;
     }
     ctx.log("[evaluator] compile OK", .{});
@@ -45,6 +46,7 @@ pub fn run(ctx: *types.Ctx, path: []const u8) !bool {
     };
     if (!ran) {
         ctx.log("[evaluator] run FAILED (term={any}):\n{s}", .{ rres.term, rres.stderr });
+        ctx.setEvalError(rres.stderr);
     } else {
         ctx.log("[evaluator] run OK (stdout):\n{s}", .{rres.stdout});
         if (rres.stderr.len > 0) ctx.log("[evaluator] run OK (stderr):\n{s}", .{rres.stderr});
@@ -56,6 +58,7 @@ pub fn run(ctx: *types.Ctx, path: []const u8) !bool {
     defer if (o_path.len > 0) ctx.allocator.free(o_path);
     std.Io.Dir.deleteFile(std.Io.Dir.cwd(), ctx.io, o_path) catch {};
 
+    if (ran) ctx.clearEvalError();
     ctx.record("evaluator: done");
     return ran;
 }
@@ -82,6 +85,7 @@ test "evaluator.run gates deploy on compile+run" {
 
     var ctx = try types.Ctx.init(allocator, io, .empty, .no_hitl, .mock, null, "", ".");
     try std.testing.expect(try run(&ctx, good));
+    try std.testing.expect(ctx.eval_error == null);
 
     const bad = "eval_test_bad.zig";
     {
@@ -95,4 +99,5 @@ test "evaluator.run gates deploy on compile+run" {
     defer std.Io.Dir.deleteFile(cwd, io, bad) catch {};
 
     try std.testing.expect(!(try run(&ctx, bad)));
+    if (ctx.eval_error) |e| ctx.allocator.free(e);
 }

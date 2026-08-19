@@ -24,6 +24,7 @@ pub const Ctx = struct {
     workdir: []const u8,
     tokens: usize,
     cache: ?*cache_mod.Cache,
+    eval_error: ?[]const u8,
     events: std.ArrayList([]const u8),
 
     pub fn init(allocator: std.mem.Allocator, io: std.Io, environ: std.process.Environ, mode: Mode, backend: LlmBackend, key: ?[]const u8, base: []const u8, workdir: []const u8) !Ctx {
@@ -38,6 +39,7 @@ pub const Ctx = struct {
             .workdir = workdir,
             .tokens = 0,
             .cache = null,
+            .eval_error = null,
             .events = try std.ArrayList([]const u8).initCapacity(allocator, 0),
         };
     }
@@ -45,6 +47,14 @@ pub const Ctx = struct {
     pub fn record(self: *Ctx, msg: []const u8) void {
         const owned = self.allocator.dupe(u8, msg) catch return;
         self.events.append(self.allocator, owned) catch {};
+    }
+    pub fn setEvalError(self: *Ctx, msg: []const u8) void {
+        if (self.eval_error) |old| self.allocator.free(old);
+        self.eval_error = self.allocator.dupe(u8, msg) catch null;
+    }
+    pub fn clearEvalError(self: *Ctx) void {
+        if (self.eval_error) |old| self.allocator.free(old);
+        self.eval_error = null;
     }
 
     pub fn log(self: *Ctx, comptime fmt: []const u8, args: anytype) void {

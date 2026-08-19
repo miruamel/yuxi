@@ -27,65 +27,56 @@ pub fn run(allocator: std.mem.Allocator, io: std.Io, ctx: *types.Ctx, task: []co
         ctx.log("[engine] ABORT at orchestrator", .{});
         return;
     }
-    // LAYER 3-6: per step (Builder -> Critic), then compose + Evaluator -> Deploy
+    // LAYER 3-6: per step (Builder -> Critic), then compose + Evaluator -> Deploy.
+    // On evaluation failure the compiler/run error is fed back to the builder
+    // and the pipeline is rebuilt up to `max_attempts` times (self-correction).
     var fragments = try std.ArrayList([]const u8).initCapacity(allocator, 0);
-    var composed = true;
-    for (steps.items, 0..) |*step, i| {
-        const path = try std.fmt.allocPrint(allocator, "{s}/gen_{d}.zig", .{ ctx.workdir, i });
-        defer allocator.free(path);
-        if (!try builder.run(ctx, step, path)) {
-            ctx.log("[engine] step {d} not built", .{step.id});
-            composed = false;
-            break;
-        }
-        var code = fs.readFileAlloc(allocator, path) catch |e| {
-            ctx.log("[engine] read failed: {s}", .{@errorName(e)});
-            composed = false;
-            break;
-        };
-        var approved = try critic.run(ctx, code);
-        if (!approved) {
-            resilience.fallback(ctx);
-            ctx.log("[engine] critic rejected; retry build (fallback={s})", .{@tagName(ctx.backend)});
-            _ = try builder.run(ctx, step, path);
-            allocator.free(code);
-            code = fs.readFileAlloc(allocator, path) catch |e| {
-                ctx.log("[engine] read failed: {s}", .{@errorName(e)});
+    var verified = false;
+    var feedback: ?[]const u8 = null;
+    defer if (feedback) |f| allocator.free(f);
+    const max_attempts: usize = 3;
+    var attempt: usize = 0;
+    while (attempt < max_attempts) : (attempt += 1) {
+        for (fragments.items) |f| allocator.free(f);
+        fragments.clearRetainingCapacity();
+        var composed = true;
+        for (steps.items, 0..) |*step, i| {
+            const frag = try buildStep(allocator, ctx, step, i, if (attempt == 0) null else feedback);
+            if (frag == null) {
                 composed = false;
                 break;
-            };
-            approved = try critic.run(ctx, code);
+            }
+            try fragments.append(allocator, frag.?);
         }
-        if (!approved) {
-            ctx.log("[engine] step {d} rejected by critic", .{step.id});
-            allocator.free(code);
-            composed = false;
-            break;
-        }
-        try fragments.append(allocator, code);
-    }
-
-    if (composed) {
+        if (!composed) break;
         const merged = try compose(allocator, fragments.items);
         defer allocator.free(merged);
         const merged_path = try std.fmt.allocPrint(allocator, "{s}/gen_final.zig", .{ctx.workdir});
         defer allocator.free(merged_path);
         try fs.writeFileAlloc(allocator, merged_path, merged);
-        ctx.log("[engine] composed {d} steps -> {s}", .{ fragments.items.len, merged_path });
-        const verified = try evaluator.run(ctx, merged_path);
-        if (verified) {
-            _ = try deploy.run(ctx, merged_path);
-            // Per-step fragments are now redundant with the composed artifact.
-            for (steps.items, 0..) |_, i| {
-                const p = try std.fmt.allocPrint(allocator, "{s}/gen_{d}.zig", .{ ctx.workdir, i });
-                defer allocator.free(p);
-                fs.deleteFile(io, p) catch |e| ctx.log("[engine] keep gen_{d}: {s}", .{ i, @errorName(e) });
+        ctx.log("[engine] attempt {d}/{d}: composed {d} steps -> {s}", .{ attempt + 1, max_attempts, fragments.items.len, merged_path });
+        verified = try evaluator.run(ctx, merged_path);
+        if (verified) break;
+        ctx.log("[engine] attempt {d}/{d} failed evaluation", .{ attempt + 1, max_attempts });
+        if (attempt + 1 < max_attempts) {
+            if (ctx.eval_error) |e| {
+                if (feedback) |f| allocator.free(f);
+                feedback = try allocator.dupe(u8, e);
+                ctx.log("[engine] retrying with eval error feedback", .{});
             }
-        } else {
-            ctx.log("[engine] composition not deployed (evaluation failed)", .{});
+        }
+    }
+    if (verified) {
+        const final_path = try std.fmt.allocPrint(allocator, "{s}/gen_final.zig", .{ctx.workdir});
+        defer allocator.free(final_path);
+        _ = try deploy.run(ctx, final_path);
+        for (steps.items, 0..) |_, i| {
+            const p = try std.fmt.allocPrint(allocator, "{s}/gen_{d}.zig", .{ ctx.workdir, i });
+            defer allocator.free(p);
+            fs.deleteFile(io, p) catch |err| ctx.log("[engine] keep gen_{d}: {s}", .{ i, @errorName(err) });
         }
     } else {
-        ctx.log("[engine] composition aborted; nothing deployed", .{});
+        ctx.log("[engine] no verified build; nothing deployed", .{});
     }
     for (fragments.items) |f| allocator.free(f);
     fragments.deinit(allocator);
@@ -166,4 +157,37 @@ fn fileExists(path: []const u8) bool {
     };
     std.os.linux.close(fd);
     return true;
+}
+/// Build one step (Builder -> Critic) and return its composed fragment, or
+/// null if the step cannot be built or is rejected by the critic. `feedback`
+/// (a prior evaluation error) is forwarded to the builder on retries.
+fn buildStep(allocator: std.mem.Allocator, ctx: *types.Ctx, step: *types.Step, i: usize, feedback: ?[]const u8) !?[]const u8 {
+    const path = try std.fmt.allocPrint(allocator, "{s}/gen_{d}.zig", .{ ctx.workdir, i });
+    defer allocator.free(path);
+    if (!try builder.run(ctx, step, path, feedback)) {
+        ctx.log("[engine] step {d} not built", .{step.id});
+        return null;
+    }
+    var code = fs.readFileAlloc(allocator, path) catch |e| {
+        ctx.log("[engine] read failed: {s}", .{@errorName(e)});
+        return null;
+    };
+    var approved = try critic.run(ctx, code);
+    if (!approved) {
+        resilience.fallback(ctx);
+        ctx.log("[engine] critic rejected; retry build (fallback={s})", .{@tagName(ctx.backend)});
+        _ = try builder.run(ctx, step, path, null);
+        allocator.free(code);
+        code = fs.readFileAlloc(allocator, path) catch |e| {
+            ctx.log("[engine] read failed: {s}", .{@errorName(e)});
+            return null;
+        };
+        approved = try critic.run(ctx, code);
+    }
+    if (!approved) {
+        ctx.log("[engine] step {d} rejected by critic", .{step.id});
+        allocator.free(code);
+        return null;
+    }
+    return code;
 }
