@@ -96,6 +96,7 @@ pub fn run(allocator: std.mem.Allocator, io: std.Io, ctx: *types.Ctx, task: []co
     knowledge.log(ctx, "task pipeline complete");
     // LAYER 9: Monitoring
     monitoring.report(ctx);
+    monitoring.assessHealth(ctx);
     types.logLine(io, "[engine] done. events={d}", .{ctx.events.items.len});
 }
 /// Merge step fragments into one runnable program: a std import, each step
