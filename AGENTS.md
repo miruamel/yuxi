@@ -149,8 +149,19 @@ Flat imports from `src/`: `@import("core/types.zig")`, not `../core/types.zig`.
 - `6ed8f54` feat: behavioral verification (`--expect`) with file-captured output.
 
 ## Open questions (for the co-owner, not silently built)
-- `--dry-run` / plan mode: what should it surface — plan only, critic verdict, or
-  eval result? Product-shaping call; deferred pending direction.
-- `--hitl` is parsed but the engine currently auto-deploys on verified regardless
-  of mode; gating deploy behind human approval would conflict with the autonomous
-  owner mandate, so left as-is pending direction.
+- `--dry-run` / plan mode (Product-shaping fork; needs co-owner call): what
+  should it surface — the decomposed `STEP:` plan only, the critic verdict on
+  the first generated artifact, or the full eval result? **My lean: plan +
+  critic verdict, not full eval** — eval requires a full build and defeats the
+  "cheap preview before spending tokens" purpose; plan+verdict is enough to
+  sanity-check direction. **Stakes:** surfacing full eval turns the mode into a
+  second pipeline run (not a preview); plan-only hides whether the critic would
+  reject the code.
+- `--hitl` deploy gating (Product-shaping fork; needs co-owner call): flag is
+  parsed but the engine auto-deploys on verified regardless of mode. **My lean:
+  keep auto-deploy as default (honors the autonomous owner mandate) and make
+  `--hitl` gate only the write/commit step, not compile+run eval** — human
+  approval before the artifact is persisted, but the loop still self-verifies.
+  **Stakes:** gating eval behind a human breaks the autonomous loop and the §30
+  runtime-feedback signal; gating only persistence keeps oversight at the
+  irreversible boundary without throttling self-correction.
