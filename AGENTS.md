@@ -76,6 +76,14 @@ sets `ctx.eval_error`, which the self-correction loop feeds back to the builder 
 `feedback` (up to 3 retries) — so an LLM backend can correct behavior, not just
 compile errors. Mock backend output is deterministic, so `--expect "step result: 2+3=5"`
 passes and `--expect "nope"` triggers the retry path.
+- **Mock internals (don't regress):** the mock orchestrator always decomposes
+  into a fixed 3-step plan; only the final `add a unit test` step emits output,
+  so the composed binary prints a single line and `--expect` matches
+  deterministically. Making the other steps also print re-breaks `--expect`
+  (tripled output → self-correction exhausts without a deploy).
+- `loop.runTasks` (`--tasks`) gives each task its own nested workdir
+  `<workdir>/<idx>`; `fs.ensureDir` now creates the missing parent, so a
+  fresh workdir no longer fails with `DirCreateFailed`.
 
 ## Run metrics (observability, feat)
 `Ctx` carries five autonomy-health counters incremented at their event
@@ -139,6 +147,9 @@ Flat imports from `src/`: `@import("core/types.zig")`, not `../core/types.zig`.
 - `.gitignore` covers binaries, build dirs, `gen_*.zig`, `.yuxi_cache`, `/ae_out/`.
 
 ## Recent cycles (category balance, §14)
+- `3a16e4d` feat: batch task execution via --tasks (loop.runTasks: per-task workdir + batch health report).
+- `d759878` fix: ensureDir creates nested parent dirs (unbreaks --tasks workdir; was DirCreateFailed).
+- `eef6a4f` fix: mock emits single-line output so --expect matches (was tripled by 3-step compose).
 - `8b62080` feat: structured run metrics for autonomy health (§30/§32).
 - `1ae73b6` feat: end-of-run autonomy-health verdict consumes run metrics (§30/§32).
 - `d4a64c2` docs: README current with `--max-tokens` + run-metrics counters (§24).
