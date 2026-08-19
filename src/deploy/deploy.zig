@@ -1,5 +1,5 @@
 const std = @import("std");
-const types = @import("../core/types.zig");
+const types = @import("types");
 
 /// Commit a generated file into an isolated git repository inside `ctx.workdir`,
 /// so a Yuxi run yields a self-contained, versioned artifact directory instead of

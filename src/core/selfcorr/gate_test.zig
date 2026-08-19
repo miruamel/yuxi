@@ -1,7 +1,7 @@
 const std = @import("std");
-const types = @import("../types.zig");
-const fs = @import("../../util/fs.zig");
-const engine = @import("../engine.zig");
+const types = @import("types");
+const fs = @import("fs");
+const engine = @import("engine");
 
 // Injected backend that always emits a process-spawning construct, so the
 // critic's dangerous-construct denylist must reject it before any deploy.

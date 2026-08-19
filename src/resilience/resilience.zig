@@ -1,5 +1,5 @@
 const std = @import("std");
-const types = @import("../core/types.zig");
+const types = @import("types");
 
 /// Circuit-breaker fallback: switch to mock backend after an LLM failure.
 pub fn fallback(ctx: *types.Ctx) void {

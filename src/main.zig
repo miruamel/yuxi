@@ -1,7 +1,7 @@
 const std = @import("std");
-const config = @import("core/config.zig");
-const engine = @import("core/engine.zig");
-const loop = @import("loop.zig");
+const config = @import("config");
+const engine = @import("engine");
+const loop = @import("loop");
 
 pub fn main(init: std.process.Init) !void {
     const arena = init.arena.allocator();

@@ -1,6 +1,6 @@
 const std = @import("std");
-const types = @import("../core/types.zig");
-const replay = @import("replay.zig");
+const types = @import("types");
+const replay = @import("replay");
 
 /// Single LLM entry point. Dispatches on Ctx.backend.
 pub fn complete(allocator: std.mem.Allocator, io: std.Io, ctx: *types.Ctx, system: []const u8, user: []const u8) ![]u8 {

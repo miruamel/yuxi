@@ -1,8 +1,8 @@
 const std = @import("std");
-const types = @import("../core/types.zig");
-const transport = @import("../llm/transport.zig");
-const fs = @import("../util/fs.zig");
-const resilience = @import("../resilience/resilience.zig");
+const types = @import("types");
+const transport = @import("transport");
+const fs = @import("fs");
+const resilience = @import("resilience");
 
 pub fn run(ctx: *types.Ctx, step: *types.Step, path: []const u8, feedback: ?[]const u8) !bool {
     ctx.log("[builder] planning step {d}: {s}", .{ step.id, step.name });

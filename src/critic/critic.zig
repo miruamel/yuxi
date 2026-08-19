@@ -1,6 +1,6 @@
 const std = @import("std");
-const types = @import("../core/types.zig");
-const transport = @import("../llm/transport.zig");
+const types = @import("types");
+const transport = @import("transport");
 
 pub const Verdict = struct {
     ok: bool,

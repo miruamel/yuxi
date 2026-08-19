@@ -1,16 +1,16 @@
 const std = @import("std");
-const types = @import("types.zig");
-const buildstep = @import("step.zig");
-const gateway = @import("../gateway/gateway.zig");
-const orchestrator = @import("../orchestrator/orchestrator.zig");
-const evaluator = @import("../evaluator/evaluator.zig");
-const deploy = @import("../deploy/deploy.zig");
-const resilience = @import("../resilience/resilience.zig");
-const knowledge = @import("../knowledge/knowledge.zig");
-const monitoring = @import("../monitoring/monitoring.zig");
-const fs = @import("../util/fs.zig");
-const config = @import("config.zig");
-const cache_mod = @import("../util/cache.zig");
+const types = @import("types");
+const buildstep = @import("step");
+const gateway = @import("gateway");
+const orchestrator = @import("orchestrator");
+const evaluator = @import("evaluator");
+const deploy = @import("deploy");
+const resilience = @import("resilience");
+const knowledge = @import("knowledge");
+const monitoring = @import("monitoring");
+const fs = @import("fs");
+const config = @import("config");
+const cache_mod = @import("cache");
 
 pub fn run(allocator: std.mem.Allocator, io: std.Io, ctx: *types.Ctx, task: []const u8) !void {
     types.logLine(io, "=== Yuxi (玉溪): autonomous software evolution engine ===", .{});
@@ -176,7 +176,7 @@ fn compose(alloc: std.mem.Allocator, frags: [][]const u8) ![]u8 {
 }
 test "compose merges step fragments with a main harness" {
     const allocator = std.testing.allocator;
-    const frags = [_][]const u8{
+    var frags = [_][]const u8{
         "pub fn step0() void { std.debug.print(\"a\", .{}); }",
         "pub fn step1() void { std.debug.print(\"b\", .{}); }",
     };
@@ -221,6 +221,6 @@ pub fn fileExists(path: []const u8) bool {
         if (e == error.FileNotFound) return false;
         return true;
     };
-    std.os.linux.close(fd);
+    _ = std.os.linux.close(fd);
     return true;
 }

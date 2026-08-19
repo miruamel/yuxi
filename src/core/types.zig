@@ -1,5 +1,5 @@
 const std = @import("std");
-const cache_mod = @import("../util/cache.zig");
+const cache_mod = @import("cache");
 
 pub const Mode = enum { hitl, no_hitl };
 pub const LlmBackend = enum { mock, openai, local };

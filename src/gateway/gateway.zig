@@ -1,5 +1,5 @@
 const std = @import("std");
-const types = @import("../core/types.zig");
+const types = @import("types");
 
 pub fn run(ctx: *types.Ctx, task: []const u8) !bool {
     // Auth: optional token gate.

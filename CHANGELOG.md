@@ -12,12 +12,18 @@ tracked history by capability; commit hashes reference `git log`.
   deploy nothing; the completion line now reflects the actual outcome
   (deployed vs not).
 
-### Known defect (tracked issue #3)
-- `zig build test` executes **0 tests**. Zig 0.16 collects `test` blocks only
-  from the root module, so the `src/tests.zig` aggregator silently runs
-  nothing. The integration tests listed under v0.1.0 are written but not yet
-  executed. Fix: repo-wide module-name imports + per-file `addTest` roots.
-  Until landed, a green CI run is NOT proof of behavior.
+### Test suite now runs (issue #3 resolved)
+- `fix`: `zig build test` executes the real test suite. Every source file is a
+  public named module (`@import("types")`, registered in `build.zig`) and each
+  test-bearing file is its own `addTest` root, so Zig 0.16's root-only test
+  collection no longer drops them. The module-name import refactor (all
+  `@import` paths → names) plus per-file test roots landed. CI green now means
+  tests actually passed, not that nothing ran. The refactor also surfaced and
+  fixed latent Zig 0.16 `std.Io` API mismatches the previously-vacuous suite
+  had hidden: `file.close(io)` (1-arg), `w.interface.writeAll` + `w.flush()`,
+  `_ = std.os.linux.close(fd)`, `var frags` slice coercion in the compose
+  test, and complete `config.Config` literals (added `--kb`/`--replay`/`--record`
+  fields).
 
 ## v0.1.0 (2026-08-19)
 

@@ -1,7 +1,7 @@
 const std = @import("std");
-const types = @import("core/types.zig");
-const config = @import("core/config.zig");
-const engine = @import("core/engine.zig");
+const types = @import("types");
+const config = @import("config");
+const engine = @import("engine");
 
 pub const TaskResult = struct {
     task: []const u8,

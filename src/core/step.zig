@@ -1,9 +1,9 @@
 const std = @import("std");
-const types = @import("types.zig");
-const builder = @import("../builder/builder.zig");
-const critic = @import("../critic/critic.zig");
-const resilience = @import("../resilience/resilience.zig");
-const fs = @import("../util/fs.zig");
+const types = @import("types");
+const builder = @import("builder");
+const critic = @import("critic");
+const resilience = @import("resilience");
+const fs = @import("fs");
 
 /// Build one step (Builder -> Critic). A critic rejection regenerates THIS step
 /// with the critic's reason as builder feedback (no global backend downgrade);

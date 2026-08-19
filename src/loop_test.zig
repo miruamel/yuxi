@@ -1,6 +1,6 @@
 const std = @import("std");
-const config = @import("core/config.zig");
-const loop = @import("loop.zig");
+const config = @import("config");
+const loop = @import("loop");
 
 test "loop.runTasks iterates tasks, skips comments, reports health" {
     const allocator = std.heap.page_allocator;
@@ -9,12 +9,12 @@ test "loop.runTasks iterates tasks, skips comments, reports health" {
 
     {
         const file = try std.Io.Dir.createFile(std.Io.Dir.cwd(), io, tasks_path, .{});
-        defer file.close();
+        defer file.close(io);
         var buf: [1024]u8 = undefined;
         var w = file.writer(io, &buf);
-        try w.writeAll("add a function returning 42\n# a comment\nadd a function returning 7\n\n");
+        try w.interface.writeAll("add a function returning 42\n# a comment\nadd a function returning 7\n\n");
+        try w.flush();
     }
-
     const cfg = config.Config{
         .mode = .no_hitl,
         .backend = .mock,
@@ -24,6 +24,9 @@ test "loop.runTasks iterates tasks, skips comments, reports health" {
         .expect = null,
         .max_tokens = null,
         .tasks = tasks_path,
+        .kb_path = null,
+        .replay_path = null,
+        .record_path = null,
     };
 
     var results = try loop.runTasks(allocator, io, .empty, cfg, tasks_path);

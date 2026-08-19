@@ -1,6 +1,6 @@
 const std = @import("std");
-const types = @import("../core/types.zig");
-const fs = @import("../util/fs.zig");
+const types = @import("types");
+const fs = @import("fs");
 
 /// Serve the next recorded LLM response from `path`, in call order, so the
 /// real `.openai`/`.local` backend path runs offline (CI, tests) without an

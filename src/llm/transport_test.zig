@@ -1,24 +1,25 @@
 const std = @import("std");
-const types = @import("../core/types.zig");
-const engine = @import("../core/engine.zig");
-const transport = @import("transport.zig");
-const fs = @import("../util/fs.zig");
+const types = @import("types");
+const engine = @import("engine");
+const transport = @import("transport");
+const fs = @import("fs");
 
 test "transport.complete serves recorded responses in order (offline replay)" {
     const allocator = std.testing.allocator;
     const io = std.Io.Threaded.global_single_threaded.io();
     const path = "/tmp/yuxi_replay_unit.txt";
     const file = try std.Io.Dir.createFile(std.Io.Dir.cwd(), io, path, .{});
-    defer file.close();
+    defer file.close(io);
     var buf: [1024]u8 = undefined;
     var w = file.writer(io, &buf);
-    try w.writeAll(
+    try w.interface.writeAll(
         \\REPLAY_MARKER_ALPHA
         \\---
         \\REPLAY_MARKER_BETA
         \\---
         \\REPLAY_MARKER_GAMMA
     );
+    try w.flush();
 
     var ctx = try types.Ctx.init(allocator, io, .empty, .no_hitl, .openai, null, "", "/tmp");
     ctx.replay_path = path;
@@ -49,10 +50,10 @@ test "engine.run drives the real openai backend offline via --replay" {
     // (orchestrator -> builder -> critic per step), so replay replaces the
     // network without changing engine behavior.
     const file = try std.Io.Dir.createFile(std.Io.Dir.cwd(), io, replay_path, .{});
-    defer file.close();
+    defer file.close(io);
     var buf: [8192]u8 = undefined;
     var w = file.writer(io, &buf);
-    try w.writeAll(
+    try w.interface.writeAll(
         \\STEP: design the function signature
         \\STEP: implement the body
         \\STEP: add a unit test
@@ -82,6 +83,7 @@ test "engine.run drives the real openai backend offline via --replay" {
         \\---
         \\APPROVE
     );
+    try w.flush();
 
     var ctx = try types.Ctx.init(allocator, io, .empty, .no_hitl, .openai, null, "", workdir);
     ctx.replay_path = replay_path;

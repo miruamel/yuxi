@@ -155,17 +155,17 @@ Gotchas paid for this cycle:
 <=5 files/dir, <=200 SLOC/file, deep nesting by capability.
 Flat imports from `src/`: `@import("core/types.zig")`, not `../core/types.zig`.
 
-## Test runner (Zig 0.16 limitation)
-`zig build test` currently runs **0 tests**. Zig 0.16 only collects `test`
-blocks from the ROOT module, so `@import`-ing test files from `src/tests.zig`
-does not execute them (verified: root-only collection; imported tests pruned).
-Each test-bearing file must therefore be its own `addTest` root. Sub-directory
-test files (e.g. `src/llm/transport_test.zig`) cannot be roots because their
-`../core/...` imports escape the module path, and `CreateOptions` exposes no
-way to widen it. Fix (issue #3): switch the tree to **module-name imports**
-(`@import("types")`, registered in `build.zig`) so any file can be a root
-anywhere, then add each test file as a `b.addTest` root. Until then the suite
-is vacuous — CI is green but proves nothing. Do NOT trust a green run.
+## Test runner (module-name imports)
+`zig build test` runs every `test` block in the tree. Zig 0.16 only collects
+`test` blocks from the **root module** of a test build, so a single aggregator
+file can't pull in other files' tests. Fix (issue #3, landed): every source
+file is a public named module (`@import("types")`, registered in `build.zig`),
+and each test-bearing file is its own `addTest` root. Sub-directory test files
+cannot be roots with relative `../` imports (they escape the module path),
+which is why imports are by name. The dependency graph is a DAG, so `build.zig`
+wires every module to every other (except itself) — no per-file import list to
+maintain. To add a test, drop a `test` block in the relevant file and list the
+file in `build.zig`'s `test_files`. CI green now means tests actually passed.
 
 ## Known gaps (next cycles)
 - Gateway rate-limit removed (fork #1 resolved): `main.zig` runs one task then

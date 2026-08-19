@@ -1,6 +1,6 @@
 const std = @import("std");
-const types = @import("../core/types.zig");
-const knowledge = @import("knowledge.zig");
+const types = @import("types");
+const knowledge = @import("knowledge");
 
 fn countNewlines(s: []const u8) usize {
     var n: usize = 0;

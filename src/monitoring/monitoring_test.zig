@@ -1,6 +1,6 @@
 const std = @import("std");
-const types = @import("../core/types.zig");
-const monitoring = @import("monitoring.zig");
+const types = @import("types");
+const monitoring = @import("monitoring");
 
 test "monitoring.assessHealth warns on an unhealthy cycle" {
     // A cycle that tried, fell back to mock, exhausted retries, and shipped

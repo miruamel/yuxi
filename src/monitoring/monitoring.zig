@@ -1,5 +1,5 @@
 const std = @import("std");
-const types = @import("../core/types.zig");
+const types = @import("types");
 
 pub fn report(ctx: *types.Ctx) void {
     ctx.log("[monitoring] events={d} tokens={d} backend={s} mode={s}", .{ ctx.events.items.len, ctx.tokens, @tagName(ctx.backend), @tagName(ctx.mode) });

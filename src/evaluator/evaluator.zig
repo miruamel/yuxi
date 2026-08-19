@@ -1,6 +1,6 @@
 const std = @import("std");
-const types = @import("../core/types.zig");
-const fs = @import("../util/fs.zig");
+const types = @import("types");
+const fs = @import("fs");
 
 pub fn run(ctx: *types.Ctx, path: []const u8) !bool {
     ctx.log("[evaluator] compile+run: {s}", .{path});
@@ -101,7 +101,7 @@ test "evaluator.run gates deploy on compile+run" {
     const good = "eval_test_good.zig";
     {
         const file = try std.Io.Dir.createFile(cwd, io, good, .{});
-        defer file.close();
+        defer file.close(io);
         var buf: [1024]u8 = undefined;
         var w = file.writer(io, &buf);
         try w.interface.writeAll(
@@ -121,7 +121,7 @@ test "evaluator.run gates deploy on compile+run" {
     const bad = "eval_test_bad.zig";
     {
         const file = try std.Io.Dir.createFile(cwd, io, bad, .{});
-        defer file.close();
+        defer file.close(io);
         var buf: [1024]u8 = undefined;
         var w = file.writer(io, &buf);
         try w.interface.writeAll("this is not valid zig @@@");
@@ -135,7 +135,7 @@ test "evaluator.run gates deploy on compile+run" {
     const spec = "eval_test_spec.zig";
     {
         const file = try std.Io.Dir.createFile(cwd, io, spec, .{});
-        defer file.close();
+        defer file.close(io);
         var buf: [1024]u8 = undefined;
         var w = file.writer(io, &buf);
         try w.interface.writeAll(

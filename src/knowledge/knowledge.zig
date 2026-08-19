@@ -1,6 +1,6 @@
 const std = @import("std");
-const types = @import("../core/types.zig");
-const fs = @import("../util/fs.zig");
+const types = @import("types");
+const fs = @import("fs");
 
 /// Append a structured event to the engine's in-memory knowledge log.
 pub fn log(ctx: *types.Ctx, text: []const u8) void {

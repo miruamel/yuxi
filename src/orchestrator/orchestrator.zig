@@ -1,7 +1,7 @@
 const std = @import("std");
-const types = @import("../core/types.zig");
-const transport = @import("../llm/transport.zig");
-const knowledge = @import("../knowledge/knowledge.zig");
+const types = @import("types");
+const transport = @import("transport");
+const knowledge = @import("knowledge");
 
 pub fn run(ctx: *types.Ctx, task: []const u8, steps: *std.ArrayList(types.Step)) !bool {
     ctx.log("[orchestrator] decomposing task", .{});
