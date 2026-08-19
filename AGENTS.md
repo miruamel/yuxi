@@ -88,8 +88,7 @@ passes and `--expect "nope"` triggers the retry path.
 ## Knowledge base (feat)
 `--kb[=DIR]` enables a persistent lesson ledger the engine learns from across
 runs — the core autonomous-evolution loop. Each run appends one line to `<DIR>`
-(default file `kb.md` when `--kb` is given without `=`), recording the task,
-outcome (deployed/failed), step count, deploys, and retries; the orchestrator
+outcome (deployed/failed) plus degradation counters (critic_rejections, mock_fallbacks, token_budgets_exceeded); step count, deploys, retries; the orchestrator
 prepends prior lessons to its decomposition prompt so later runs avoid
 repeating failures. Opt-in and off by default (`Ctx.kb_path = null`): with
 `--kb` unset no file I/O occurs and every existing test/pipeline path is
@@ -159,6 +158,7 @@ Flat imports from `src/`: `@import("core/types.zig")`, not `../core/types.zig`.
 
 ## Recent cycles (category balance, §14)
 - `fac5fa4` feat: persistent knowledge base (--kb) learns lessons across runs (§11/§12).
+- `d1c7cc0` feat: enrich knowledge-base lessons with degradation counters (§12).
 - `3a16e4d` feat: batch task execution via --tasks (loop.runTasks: per-task workdir + batch health report).
 - `d759878` fix: ensureDir creates nested parent dirs (unbreaks --tasks workdir; was DirCreateFailed).
 - `eef6a4f` fix: mock emits single-line output so --expect matches (was tripled by 3-step compose).
