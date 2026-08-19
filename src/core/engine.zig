@@ -113,3 +113,18 @@ fn compose(alloc: std.mem.Allocator, frags: [][]const u8) ![]u8 {
     }
     return try std.fmt.allocPrint(alloc, "{s}\npub fn main() void {{\n{s}}}\n", .{ body.items, calls.items });
 }
+test "compose merges step fragments with a main harness" {
+    const allocator = std.testing.allocator;
+    const frags = [_][]const u8{
+        "pub fn step0() void { std.debug.print(\"a\", .{}); }",
+        "pub fn step1() void { std.debug.print(\"b\", .{}); }",
+    };
+    const prog = try compose(allocator, &frags);
+    defer allocator.free(prog);
+    try std.testing.expect(std.mem.indexOf(u8, prog, "const std = @import(\"std\");") != null);
+    try std.testing.expect(std.mem.indexOf(u8, prog, "pub fn step0() void {") != null);
+    try std.testing.expect(std.mem.indexOf(u8, prog, "pub fn step1() void {") != null);
+    try std.testing.expect(std.mem.indexOf(u8, prog, "pub fn main() void {") != null);
+    try std.testing.expect(std.mem.indexOf(u8, prog, "    _ = step0();") != null);
+    try std.testing.expect(std.mem.indexOf(u8, prog, "    _ = step1();") != null);
+}

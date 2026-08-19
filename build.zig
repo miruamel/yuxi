@@ -16,7 +16,7 @@ pub fn build(b: *std.Build) void {
     b.installArtifact(exe);
 
     const test_mod = b.createModule(.{
-        .root_source_file = b.path("src/util/cache.zig"),
+        .root_source_file = b.path("src/tests.zig"),
         .target = target,
         .optimize = optimize,
     });

@@ -59,3 +59,40 @@ pub fn run(ctx: *types.Ctx, path: []const u8) !bool {
     ctx.record("evaluator: done");
     return ran;
 }
+test "evaluator.run gates deploy on compile+run" {
+    const allocator = std.testing.allocator;
+    const io = std.Io.Threaded.global_single_threaded.io();
+    const cwd = std.Io.Dir.cwd();
+
+    const good = "eval_test_good.zig";
+    {
+        const file = try std.Io.Dir.createFile(cwd, io, good, .{});
+        defer file.close();
+        var buf: [1024]u8 = undefined;
+        var w = file.writer(io, &buf);
+        try w.interface.writeAll(
+            \\pub fn main() void {
+            \\    const x: i32 = 2 + 3;
+            \\    if (x != 5) @panic("bad");
+            \\}
+        );
+        try w.flush();
+    }
+    defer std.Io.Dir.deleteFile(cwd, io, good) catch {};
+
+    var ctx = try types.Ctx.init(allocator, io, .empty, .no_hitl, .mock, null, "", ".");
+    try std.testing.expect(try run(&ctx, good));
+
+    const bad = "eval_test_bad.zig";
+    {
+        const file = try std.Io.Dir.createFile(cwd, io, bad, .{});
+        defer file.close();
+        var buf: [1024]u8 = undefined;
+        var w = file.writer(io, &buf);
+        try w.interface.writeAll("this is not valid zig @@@");
+        try w.flush();
+    }
+    defer std.Io.Dir.deleteFile(cwd, io, bad) catch {};
+
+    try std.testing.expect(!(try run(&ctx, bad)));
+}
