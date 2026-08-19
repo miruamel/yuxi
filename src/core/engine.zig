@@ -9,6 +9,8 @@ const resilience = @import("../resilience/resilience.zig");
 const knowledge = @import("../knowledge/knowledge.zig");
 const monitoring = @import("../monitoring/monitoring.zig");
 const fs = @import("../util/fs.zig");
+const config = @import("config.zig");
+const cache_mod = @import("../util/cache.zig");
 
 pub fn run(allocator: std.mem.Allocator, io: std.Io, ctx: *types.Ctx, task: []const u8) !void {
     types.logLine(io, "=== Yuxi (玉溪): autonomous software evolution engine ===", .{});
@@ -98,6 +100,29 @@ pub fn run(allocator: std.mem.Allocator, io: std.Io, ctx: *types.Ctx, task: []co
     monitoring.report(ctx);
     monitoring.assessHealth(ctx);
     types.logLine(io, "[engine] done. events={d}", .{ctx.events.items.len});
+}
+/// Build a run Ctx from parsed Config. `workdir` overrides cfg.workdir so the
+/// multi-task loop can give each task an isolated directory. Backend base URL
+/// and API key resolve from the environment (mirrors main.zig).
+pub fn newCtx(allocator: std.mem.Allocator, io: std.Io, environ: std.process.Environ, cfg: config.Config, workdir: []const u8) !types.Ctx {
+    const base = switch (cfg.backend) {
+        .mock => try allocator.dupe(u8, ""),
+        .openai => try allocator.dupe(u8, std.process.Environ.getPosix(environ, "OPENAI_BASE") orelse "https://api.openai.com/v1"),
+        .local => try allocator.dupe(u8, std.process.Environ.getPosix(environ, "LOCAL_BASE") orelse "http://localhost:11434/v1"),
+    };
+    const raw_key = if (cfg.backend == .openai) std.process.Environ.getPosix(environ, "OPENAI_API_KEY") else null;
+    const key: ?[]const u8 = if (raw_key) |k| allocator.dupe(u8, k) catch null else null;
+
+    var ctx = try types.Ctx.init(allocator, io, environ, cfg.mode, cfg.backend, key, base, workdir);
+    ctx.expected = cfg.expect;
+    ctx.max_tokens = cfg.max_tokens;
+    ctx.cache = blk: {
+        const cp = cfg.cache_path orelse break :blk null;
+        const c = allocator.create(cache_mod.Cache) catch break :blk null;
+        c.* = cache_mod.Cache.init(allocator, cp) catch break :blk null;
+        break :blk c;
+    };
+    return ctx;
 }
 /// Merge step fragments into one runnable program: a std import, each step
 /// function, and a `main` that calls them in order. Invalid composition

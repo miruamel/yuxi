@@ -9,6 +9,7 @@ pub const Config = struct {
     cache_path: ?[]const u8,
     expect: ?[]const u8,
     max_tokens: ?usize,
+    tasks: ?[]const u8,
 };
 
 pub fn parse(gpa: std.mem.Allocator, io: std.Io, args: *std.process.Args.Iterator) !Config {
@@ -20,6 +21,7 @@ pub fn parse(gpa: std.mem.Allocator, io: std.Io, args: *std.process.Args.Iterato
     var cache_path: ?[]const u8 = null;
     var expect: ?[]const u8 = null;
     var max_tokens: ?usize = null;
+    var tasks: ?[]const u8 = null;
 
     _ = args.next(); // argv[0]
     while (args.next()) |arg| {
@@ -33,6 +35,8 @@ pub fn parse(gpa: std.mem.Allocator, io: std.Io, args: *std.process.Args.Iterato
             cache_path = ".yuxi_cache";
         } else if (std.mem.startsWith(u8, arg, "--cache=")) {
             cache_path = arg["--cache=".len..];
+        } else if (std.mem.eql(u8, arg, "--tasks")) {
+            if (args.next()) |p| tasks = p;
         } else if (std.mem.eql(u8, arg, "--max-tokens")) {
             if (args.next()) |m| max_tokens = std.fmt.parseUnsigned(usize, m, 10) catch null;
         } else if (std.mem.eql(u8, arg, "-h") or std.mem.eql(u8, arg, "--help")) {
@@ -41,11 +45,11 @@ pub fn parse(gpa: std.mem.Allocator, io: std.Io, args: *std.process.Args.Iterato
         } else if (task == null) task = arg;
     }
 
-    const t = task orelse {
+    const t = if (tasks) |_| "" else task orelse {
         printHelp(io);
         return error.MissingTask;
     };
-    return .{ .mode = mode, .backend = backend, .task = t, .workdir = workdir, .cache_path = cache_path, .expect = expect, .max_tokens = max_tokens };
+    return .{ .mode = mode, .backend = backend, .task = t, .workdir = workdir, .cache_path = cache_path, .expect = expect, .max_tokens = max_tokens, .tasks = tasks };
 }
 fn printHelp(io: std.Io) void {
     types.logLine(io, "Yuxi (玉溪): autonomous software evolution engine", .{});
