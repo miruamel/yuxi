@@ -44,9 +44,16 @@ tracked history by capability; commit hashes reference `git log`.
   co-locates with `AGENTS.md`; `DESIGN.md` and `README.md` document the current
   pipeline.
 
+- **Critic denylist integration test** — `test:` added an engine-level test
+  (`engine.run blocks dangerous constructs via critic denylist`) that injects a
+  backend emitting `std.process.Child` and asserts the run records
+  `critic: rejected (denylist)` and never deploys (`deploy: committed` absent).
+  Exercises the §19 security gate end-to-end through the real engine, not just
+  the isolated `critic.run` unit test; uses the `Ctx.llm_fn` seam (no network).
+
 ## Repository
 
 - **CI fixed** — `.github/workflows/ci.yml` referenced a nonexistent action
-  slug (`goto-bus/setup-zig`); switched to the maintained `mlugg/setup-zig@v4`
+  slug (`goto-bus/setup-zig`); switched to the maintained `mlugg/setup-zig@v2`
   so the Zig 0.16.0 toolchain actually installs and the build/test/format
   gates run on push and PR.
