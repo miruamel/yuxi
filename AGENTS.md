@@ -54,6 +54,8 @@ non-compiling generated code. The mock backend emits deterministic, valid Zig,
 so it always succeeds on attempt 1 and never exercises the retry path.
 On the final failed attempt the intermediates are kept (`gen_*.zig` +
 `gen_final.zig`) for debugging, as before.
+The critic's verdict also feeds back: a `REJECT` regenerates the rejected
+step with the critic's reason as builder feedback before any mock fallback.
 
 ## Smoke test & gotchas
 End-to-end check, offline (no API key):
