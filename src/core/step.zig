@@ -25,6 +25,7 @@ pub fn build(allocator: std.mem.Allocator, ctx: *types.Ctx, step: *types.Step, i
         return code;
     }
     ctx.log("[engine] critic rejected step {d}: {s}", .{ step.id, v.reason orelse "no reason" });
+    ctx.critic_rejections += 1;
     allocator.free(code);
     const fb = if (v.reason) |r| r else "critic rejected";
     _ = try builder.run(ctx, step, path, fb);
@@ -39,6 +40,7 @@ pub fn build(allocator: std.mem.Allocator, ctx: *types.Ctx, step: *types.Step, i
         return code;
     }
     resilience.fallback(ctx);
+    ctx.mock_fallbacks += 1;
     if (v2.reason) |r| allocator.free(r);
     allocator.free(code);
     ctx.log("[engine] step {d} rejected after retry; fallback to mock", .{step.id});

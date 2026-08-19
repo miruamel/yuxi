@@ -39,6 +39,7 @@ pub fn run(allocator: std.mem.Allocator, io: std.Io, ctx: *types.Ctx, task: []co
         if (ctx.max_tokens) |mt| {
             if (ctx.tokens >= mt) {
                 ctx.record("engine: token budget exceeded");
+                ctx.token_budgets_exceeded += 1;
                 ctx.log("[engine] token budget exceeded ({d} >= {d}); aborting build", .{ ctx.tokens, mt });
                 break;
             }
@@ -65,6 +66,7 @@ pub fn run(allocator: std.mem.Allocator, io: std.Io, ctx: *types.Ctx, task: []co
         if (verified) break;
         ctx.log("[engine] attempt {d}/{d} failed evaluation", .{ attempt + 1, max_attempts });
         if (attempt + 1 < max_attempts) {
+            ctx.retries += 1;
             if (ctx.eval_error) |e| {
                 if (feedback) |f| allocator.free(f);
                 feedback = try allocator.dupe(u8, e);
@@ -76,6 +78,7 @@ pub fn run(allocator: std.mem.Allocator, io: std.Io, ctx: *types.Ctx, task: []co
         const final_path = try std.fmt.allocPrint(allocator, "{s}/gen_final.zig", .{ctx.workdir});
         defer allocator.free(final_path);
         _ = try deploy.run(ctx, final_path);
+        ctx.deploys += 1;
         for (steps.items, 0..) |_, i| {
             const p = try std.fmt.allocPrint(allocator, "{s}/gen_{d}.zig", .{ ctx.workdir, i });
             defer allocator.free(p);
@@ -145,6 +148,8 @@ test "engine.run removes intermediate step files, keeps gen_final" {
 
     var ctx = try types.Ctx.init(allocator, io, .empty, .no_hitl, .mock, null, "", workdir);
     try run(allocator, io, &ctx, "design a calculator");
+    try std.testing.expect(ctx.deploys >= 1);
+    try std.testing.expect(ctx.retries == 0);
 
     const final_path = try std.fmt.allocPrint(allocator, "{s}/gen_final.zig", .{workdir});
     defer allocator.free(final_path);

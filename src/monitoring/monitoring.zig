@@ -3,6 +3,7 @@ const types = @import("../core/types.zig");
 
 pub fn report(ctx: *types.Ctx) void {
     ctx.log("[monitoring] events={d} tokens={d} backend={s} mode={s}", .{ ctx.events.items.len, ctx.tokens, @tagName(ctx.backend), @tagName(ctx.mode) });
+    ctx.log("[monitoring] critic_rejections={d} mock_fallbacks={d} retries={d} deploys={d} token_budgets_exceeded={d}", .{ ctx.critic_rejections, ctx.mock_fallbacks, ctx.retries, ctx.deploys, ctx.token_budgets_exceeded });
     if (ctx.cache) |c| {
         ctx.log("[monitoring] cache hits={d} misses={d}", .{ c.hits, c.misses });
     }
