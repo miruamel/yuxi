@@ -7,8 +7,20 @@ evolution engine described in `DESIGN.md`.
 ```bash
 /opt/zig/zig build                 # produces zig-out/bin/yuxi
 ./zig-out/bin/yuxi --no-hitl --mock --task "write a function that adds two ints"
-./zig-out/bin/yuxi --hitl --local --task "..."   # pauses y/N before write
+./zig-out/bin/yuxi --hitl --local --task "..."   # --hitl reserved; engine auto-deploys on verified (see Open questions)
+- ./zig-out/bin/yuxi --no-hitl --mock --task "add two numbers" --expect "step result: 2+3=5"
 ```
+
+## CLI flags
+- `--hitl` / `--no-hitl` — human-approval mode vs fully autonomous (default no_hitl).
+- `--mock` / `--openai` / `--local` — LLM backend.
+- `--task TEXT` or trailing arg — the task prompt.
+- `--out DIR` — workdir (default `ae_out/`); isolated git repo lives here.
+- `--cache[=DIR]` — opt-in on-disk LLM-response cache (default `.yuxi_cache`).
+- `--expect TEXT` — behavioral verification (see below).
+- `--max-tokens N` — soft LLM-spend ceiling; `engine.run` aborts the build loop
+  once `ctx.tokens` reaches N, records `engine: token budget exceeded`, deploys
+  nothing. Default off.
 
 ## Verify
 ```bash
@@ -57,6 +69,14 @@ On the final failed attempt the intermediates are kept (`gen_*.zig` +
 The critic's verdict also feeds back: a `REJECT` regenerates the rejected
 step with the critic's reason as builder feedback before any mock fallback.
 
+## Behavioral verification (feat)
+`--expect TEXT` runs behavioral verification: after the evaluator compiles+runs
+the composed artifact, its captured stdout (trimmed) must equal `TEXT`. A mismatch
+sets `ctx.eval_error`, which the self-correction loop feeds back to the builder as
+`feedback` (up to 3 retries) — so an LLM backend can correct behavior, not just
+compile errors. Mock backend output is deterministic, so `--expect "step result: 2+3=5"`
+passes and `--expect "nope"` triggers the retry path.
+
 ## Smoke test & gotchas
 End-to-end check, offline (no API key):
 ```bash
@@ -73,6 +93,15 @@ Gotchas paid for this cycle:
   Use a fresh smoke dir instead of `rm`.
 - **Spawned `git` has no identity here** — rely on the `-c` flags, never
   assume global `user.name/email` exists.
+
+- **Memory is tight (~354MB free / 4.3GB used):** a full pipeline smoke can OOM.
+  Prefer `zig build test` unit/engine tests over launching the binary end-to-end.
+- **CI installs Zig via `mlugg/setup-zig@v2`** (the `goto-bus/setup-zig` slug is a
+  404). `zig fmt --check src` is the CI lint command (not `.`); `gen_*.zig` are
+  gitignored so they don't trip the check.
+- **`std.process.run` does not pipe stdio in 0.16** (captured stdout comes back
+  empty despite `.pipe` options); the evaluator captures output via
+  `std.process.spawn` + a temp file redirect + `fs.readFileAlloc`.
 
 
 ## Invariants (from DESIGN.md)
@@ -91,8 +120,26 @@ Flat imports from `src/`: `@import("core/types.zig")`, not `../core/types.zig`.
   `zig build-exe` + run using the pre-initialized `std.Io.Threaded.global_single_threaded`
   host Io (avoids allocating an Io, which would panic under `zig build test`'s
   failing-allocator re-run). `src/tests.zig` is the test root, so `zig build test`
-  covers cache, evaluator, and engine composition — not just the cache.
+  covers cache, evaluator, engine composition, and three engine-level integration
+  tests in `src/core/selfcorr_test.zig`: self-correction recovery (fail-first
+  injected backend), critic denylist block (process-spawning code never deploys),
+  and token-budget abort (`--max-tokens 1`). All use the `Ctx.llm_fn` seam or the
+  mock backend — no network, deterministic.
 - Real LLM backends (`.openai`/`.local`) shell `curl` (`transport.httpComplete`); `curl`
   must be on PATH at runtime. `extractContent` unescapes JSON `\n`/`\t` so multi-line
   generated code survives the OpenAI response — a regression test now guards this.
 - `.gitignore` covers binaries, build dirs, `gen_*.zig`, `.yuxi_cache`, `/ae_out/`.
+
+## Recent cycles (category balance, §14)
+- `ff96295` feat: token/cost budget cap (`--max-tokens`).
+- `d60859b` test: engine-level critic denylist integration test (via `Ctx.llm_fn` seam).
+- `9b58ab0` ci: fixed broken `goto-bus/setup-zig` → `mlugg/setup-zig@v2`.
+- `93b7e97` feat: injectable LLM backend seam (`Ctx.llm_fn`) + self-correction loop test.
+- `6ed8f54` feat: behavioral verification (`--expect`) with file-captured output.
+
+## Open questions (for the co-owner, not silently built)
+- `--dry-run` / plan mode: what should it surface — plan only, critic verdict, or
+  eval result? Product-shaping call; deferred pending direction.
+- `--hitl` is parsed but the engine currently auto-deploys on verified regardless
+  of mode; gating deploy behind human approval would conflict with the autonomous
+  owner mandate, so left as-is pending direction.
