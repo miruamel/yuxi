@@ -126,6 +126,7 @@ pub fn newCtx(allocator: std.mem.Allocator, io: std.Io, environ: std.process.Env
         break :blk c;
     };
     ctx.kb_path = cfg.kb_path;
+    ctx.replay_path = cfg.replay_path;
     return ctx;
 }
 /// Merge step fragments into one runnable program: a std import, each step

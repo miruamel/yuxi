@@ -11,6 +11,7 @@ pub const Config = struct {
     max_tokens: ?usize,
     tasks: ?[]const u8,
     kb_path: ?[]const u8,
+    replay_path: ?[]const u8,
 };
 
 pub fn parse(gpa: std.mem.Allocator, io: std.Io, args: *std.process.Args.Iterator) !Config {
@@ -24,6 +25,7 @@ pub fn parse(gpa: std.mem.Allocator, io: std.Io, args: *std.process.Args.Iterato
     var max_tokens: ?usize = null;
     var tasks: ?[]const u8 = null;
     var kb_path: ?[]const u8 = null;
+    var replay_path: ?[]const u8 = null;
 
     _ = args.next(); // argv[0]
     while (args.next()) |arg| {
@@ -48,6 +50,10 @@ pub fn parse(gpa: std.mem.Allocator, io: std.Io, args: *std.process.Args.Iterato
             if (args.next()) |p| kb_path = p;
         } else if (std.mem.startsWith(u8, arg, "--kb=")) {
             kb_path = arg["--kb=".len..];
+        } else if (std.mem.eql(u8, arg, "--replay")) {
+            if (args.next()) |p| replay_path = p;
+        } else if (std.mem.startsWith(u8, arg, "--replay=")) {
+            replay_path = arg["--replay=".len..];
         } else if (task == null) task = arg;
     }
 
@@ -55,9 +61,9 @@ pub fn parse(gpa: std.mem.Allocator, io: std.Io, args: *std.process.Args.Iterato
         printHelp(io);
         return error.MissingTask;
     };
-    return .{ .mode = mode, .backend = backend, .task = t, .workdir = workdir, .cache_path = cache_path, .expect = expect, .max_tokens = max_tokens, .tasks = tasks, .kb_path = kb_path };
+    return .{ .mode = mode, .backend = backend, .task = t, .workdir = workdir, .cache_path = cache_path, .expect = expect, .max_tokens = max_tokens, .tasks = tasks, .kb_path = kb_path, .replay_path = replay_path };
 }
 fn printHelp(io: std.Io) void {
     types.logLine(io, "Yuxi (玉溪): autonomous software evolution engine", .{});
-    types.logLine(io, "yuxi [--hitl|--no-hitl] [--mock|--openai|--local] [--max-tokens N] [--cache[=DIR]] [--kb[=DIR]] [--out DIR] [--task TEXT] [--expect TEXT] [--tasks FILE] TASK", .{});
+    types.logLine(io, "yuxi [--hitl|--no-hitl] [--mock|--openai|--local] [--max-tokens N] [--cache[=DIR]] [--kb[=DIR]] [--replay[=FILE]] [--out DIR] [--task TEXT] [--expect TEXT] [--tasks FILE] TASK", .{});
 }

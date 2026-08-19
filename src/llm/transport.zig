@@ -1,5 +1,6 @@
 const std = @import("std");
 const types = @import("../core/types.zig");
+const replay = @import("replay.zig");
 
 /// Single LLM entry point. Dispatches on Ctx.backend.
 pub fn complete(allocator: std.mem.Allocator, io: std.Io, ctx: *types.Ctx, system: []const u8, user: []const u8) ![]u8 {
@@ -9,6 +10,13 @@ pub fn complete(allocator: std.mem.Allocator, io: std.Io, ctx: *types.Ctx, syste
     if (ctx.llm_fn) |f| {
         ctx.tokens += user.len / 4 + system.len / 8 + 16;
         return f(allocator, io, ctx, system, user);
+    }
+    // Offline replay: serve recorded responses for the network backends so the
+    // real .openai/.local path is exercisable without an API key (CI, tests).
+    if (ctx.replay_path) |rp| {
+        if (ctx.backend == .openai or ctx.backend == .local) {
+            return replay.replayComplete(allocator, ctx, rp);
+        }
     }
     if (ctx.cache) |c| {
         if (c.get(allocator, @tagName(ctx.backend), system, user) catch null) |hit| {

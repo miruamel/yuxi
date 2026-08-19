@@ -39,6 +39,13 @@ pub const Ctx = struct {
     /// records a per-run lesson here and the orchestrator prepends prior
     /// lessons to its decomposition prompt. Null (and a no-op) by default.
     kb_path: ?[]const u8 = null,
+    /// Optional recorded-LLM-response file for offline playback. When set and
+    /// the backend is `.openai`/`.local`, transport.complete serves recorded
+    /// responses in order instead of calling the network — so the real backend
+    /// path is exercisable without an API key (CI, tests). Null by default.
+    replay_path: ?[]const u8 = null,
+    /// Position into the replay file (next entry to serve). Offline-only state.
+    replay_idx: usize = 0,
     failures: usize,
     critic_rejections: usize,
     mock_fallbacks: usize,
