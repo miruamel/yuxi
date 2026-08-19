@@ -28,15 +28,23 @@ fn mockComplete(allocator: std.mem.Allocator, system: []const u8, user: []const 
         );
     }
     if (std.mem.indexOf(u8, system, "code generator") != null) {
-        return allocator.dupe(u8,
-            \\const std = @import("std");
-            \\pub fn main() void {
+        // The builder passes "Implement step N: ...", so name the function
+        // uniquely per step; the engine composes all steps into one binary.
+        var n: usize = 0;
+        if (std.mem.indexOf(u8, user, "Implement step ")) |p| {
+            const rest = user[p + "Implement step ".len ..];
+            if (std.mem.indexOfScalar(u8, rest, ':')) |c| {
+                n = std.fmt.parseUnsigned(usize, rest[0..c], 10) catch 0;
+            }
+        }
+        return std.fmt.allocPrint(allocator,
+            \\pub fn step{d}() void {{
             \\    const a: i32 = 2;
             \\    const b: i32 = 3;
             \\    const sum = a + b;
-            \\    std.debug.print("add(2,3)={d}\n", .{sum});
-            \\}
-        );
+            \\    std.debug.print("step result: 2+3={{d}}\n", .{{sum}});
+            \\}}
+        , .{n});
     }
     if (std.mem.indexOf(u8, system, "critic") != null) {
         return allocator.dupe(u8, "APPROVE");

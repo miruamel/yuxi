@@ -33,7 +33,7 @@ re-calling the model. Opt-in; default dir `.yuxi_cache`. Cache hits also skip th
 `ctx.tokens` increment, so monitoring reports real generation cost.
 
 ## Deploy layer (verified checkpoint)
-Each generated `gen_N.zig` is committed into an *isolated* git repo inside
+The composed `gen_final.zig` (one per task) is committed into an *isolated* git repo inside
 `ctx.workdir` (default `ae_out/`) via `deploy.run`: `git -C <wd> init` + add
 + commit. Keeps engine-run artifacts out of the engine repo. Commits use an
 explicit identity (`git -c user.name=Yuxi Engine -c user.email=yuxi@localhost`)
@@ -67,9 +67,12 @@ Flat imports from `src/`: `@import("core/types.zig")`, not `../core/types.zig`.
 ## Known gaps (next cycles)
 - Remote `miruamel/Xunma` is 404; no push/release until a remote is provisioned
   (CI workflow exists but cannot run without one).
-- Evaluator now compiles each `gen_N.zig` with `zig build-exe` and **runs** the
-  binary, gating deploy on a clean run (not just syntax). Each step is a complete,
-  runnable Zig program.
-- The engine still emits one file per step; it does not yet compose multiple steps
-  into a single buildable binary (real multi-step evolution output).
+- The engine now composes every step into ONE runnable program (`gen_final.zig`):
+  each step emits a `pub fn stepN() void` fragment, the engine merges them under a
+  `main` harness, and the evaluator compiles+runs the single artifact. Deploy gates
+  on a clean compile+run; one artifact per task, not N disconnected files.
+- Evaluator has no unit test yet: it shells `zig build-exe` and needs a `std.Io` for
+  `std.process.run`. The standalone `std.Io` constructor for tests is unclear in 0.16,
+  so it is verified end-to-end (smoke) instead. Add a test module once that idiom is
+  confirmed.
 - `.gitignore` covers binaries, build dirs, `gen_*.zig`, `.yuxi_cache`, `/ae_out/`.

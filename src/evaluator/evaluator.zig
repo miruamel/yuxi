@@ -46,7 +46,8 @@ pub fn run(ctx: *types.Ctx, path: []const u8) !bool {
     if (!ran) {
         ctx.log("[evaluator] run FAILED (term={any}):\n{s}", .{ rres.term, rres.stderr });
     } else {
-        ctx.log("[evaluator] run OK:\n{s}", .{rres.stdout});
+        ctx.log("[evaluator] run OK (stdout):\n{s}", .{rres.stdout});
+        if (rres.stderr.len > 0) ctx.log("[evaluator] run OK (stderr):\n{s}", .{rres.stderr});
     }
 
     // Best-effort cleanup of the temporary executable and any emitted object file.

@@ -6,8 +6,8 @@ const resilience = @import("../resilience/resilience.zig");
 
 pub fn run(ctx: *types.Ctx, step: *types.Step, path: []const u8) !bool {
     ctx.log("[builder] planning step {d}: {s}", .{ step.id, step.name });
-    const sys = "You are a code generator. Output a complete, runnable Zig program with `pub fn main() void`. No markdown, no explanation.";
-    const user = try std.fmt.allocPrint(ctx.allocator, "Implement: {s}", .{step.name});
+    const sys = "You are a code generator for ONE step of a larger program. Emit exactly one Zig function named `stepN` (N = the step number you are given) with signature `pub fn stepN() void`. Do NOT add `const std = @import(\"std\");` and do NOT write `main` -- the harness supplies the import and entry point. No markdown, no explanation.";
+    const user = try std.fmt.allocPrint(ctx.allocator, "Implement step {d}: {s}", .{ step.id, step.name });
     defer ctx.allocator.free(user);
 
     const code = transport.complete(ctx.allocator, ctx.io, ctx, sys, user) catch |e| {
