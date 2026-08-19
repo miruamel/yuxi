@@ -98,11 +98,54 @@ fn extractContent(allocator: std.mem.Allocator, body: []const u8) ![]u8 {
     while (i < body.len) : (i += 1) {
         if (body[i] == '\\') {
             i += 1;
-            if (i < body.len) try out.append(allocator, body[i]);
+            if (i >= body.len) break;
+            switch (body[i]) {
+                'n' => try out.append(allocator, '\n'),
+                't' => try out.append(allocator, '\t'),
+                'r' => try out.append(allocator, '\r'),
+                'b' => try out.append(allocator, 0x08),
+                'f' => try out.append(allocator, 0x0C),
+                else => try out.append(allocator, body[i]),
+            }
             continue;
         }
         if (body[i] == '"') break;
         try out.append(allocator, body[i]);
     }
     return out.toOwnedSlice(allocator);
+}
+
+test "extractContent decodes OpenAI JSON string escapes" {
+    const a = std.testing.allocator;
+    const body1 =
+        \\{"choices":[{"message":{"content":"pub fn step0() void {}"}}]}
+    ;
+    const got1 = try extractContent(a, body1);
+    defer a.free(got1);
+    try std.testing.expectEqualStrings("pub fn step0() void {}", got1);
+
+    const body2 =
+        \\{"choices":[{"message":{"content":"a \"quote\" b"}}]}
+    ;
+    const got2 = try extractContent(a, body2);
+    defer a.free(got2);
+    try std.testing.expectEqualStrings("a \"quote\" b", got2);
+
+    const body3 =
+        \\{"choices":[{"message":{"content":"line1\nline2\tend"}}]}
+    ;
+    const got3 = try extractContent(a, body3);
+    defer a.free(got3);
+    try std.testing.expectEqualStrings("line1\nline2\tend", got3);
+
+    const got4 = try extractContent(a, "no content field here");
+    defer a.free(got4);
+    try std.testing.expectEqualStrings("", got4);
+}
+
+test "jsonEscape escapes JSON string syntax" {
+    const a = std.testing.allocator;
+    const got = try jsonEscape(a, "a\"b\\c\nd");
+    defer a.free(got);
+    try std.testing.expectEqualStrings("a\\\"b\\\\c\\nd", got);
 }

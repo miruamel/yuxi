@@ -77,4 +77,7 @@ Flat imports from `src/`: `@import("core/types.zig")`, not `../core/types.zig`.
   host Io (avoids allocating an Io, which would panic under `zig build test`'s
   failing-allocator re-run). `src/tests.zig` is the test root, so `zig build test`
   covers cache, evaluator, and engine composition — not just the cache.
+- Real LLM backends (`.openai`/`.local`) shell `curl` (`transport.httpComplete`); `curl`
+  must be on PATH at runtime. `extractContent` unescapes JSON `\n`/`\t` so multi-line
+  generated code survives the OpenAI response — a regression test now guards this.
 - `.gitignore` covers binaries, build dirs, `gen_*.zig`, `.yuxi_cache`, `/ae_out/`.

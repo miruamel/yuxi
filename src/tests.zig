@@ -8,3 +8,5 @@ const std = @import("std");
 const _cache = @import("util/cache.zig");
 const _evaluator = @import("evaluator/evaluator.zig");
 const _engine = @import("core/engine.zig");
+
+const _transport = @import("llm/transport.zig");
