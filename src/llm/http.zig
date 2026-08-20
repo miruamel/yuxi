@@ -42,14 +42,21 @@ pub fn complete(allocator: std.mem.Allocator, io: std.Io, ctx: *types.Ctx, syste
 
     const max_attempts: usize = 3;
     var attempt: usize = 0;
+    // Set once a transient failure was retried (not on the final, fatal
+    // attempt). Used only to surface retry churn in the autonomy metrics — a
+    // retry that recovers is not a degradation, so it must NOT count toward
+    // mock_fallbacks or trip the health check.
+    var recovered = false;
     while (attempt < max_attempts) : (attempt += 1) {
         const got = curlOnce(allocator, io, url, auth, body) catch |e| {
             ctx.log("[transport] http attempt {d}/{d} failed: {s}", .{ attempt + 1, max_attempts, @errorName(e) });
             if (attempt + 1 < max_attempts) {
+                recovered = true;
                 continue;
             }
             return e;
         };
+        if (recovered) ctx.network_retries += 1;
         return got;
     }
     return error.RequestFailed;

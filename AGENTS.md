@@ -208,13 +208,14 @@ numeric `critic_rej=N` counter that `recordLesson` records.
   Null by default (no cap = historical behavior). Wire: `config.kb_max_lines`
   → `Ctx.kb_max_lines` → `knowledge.injectPrompt` → `tailLessons`.
 
-## Run metrics (observability, feat)
-`Ctx` carries five autonomy-health counters incremented at their event
-sites: `critic_rejections`, `mock_fallbacks`, `retries` (self-correction
-rebuilds), `deploys`, `token_budgets_exceeded`. `monitoring.report` emits
-them alongside events/tokens so the loop can read its own effectiveness
-(critic reject rate, mock-fallback frequency, retry churn, deploy rate)
-without parsing event strings.
+`Ctx` carries six autonomy-health counters incremented at their event sites:
+critic_rejections, mock_fallbacks, retries (self-correction rebuilds), deploys,
+network_retries (recovered HTTP retries from `http.complete`), and
+token_budgets_exceeded. `monitoring.report` emits them alongside events/tokens
+so the loop can read its own effectiveness (critic reject rate, mock-fallback
+frequency, retry churn, deploy rate) without parsing event strings.
+`network_retries` is observability-only: a recovered transient network blip is
+NOT a degradation, so it never trips `assessHealth` (unlike `mock_fallbacks`).
 
 ## Smoke test & gotchas
 End-to-end check, offline (no API key):
