@@ -44,6 +44,8 @@ pub fn run(ctx: *types.Ctx, task: []const u8, steps: *std.ArrayList(types.Step))
     if (ctx.max_steps) |cap| {
         if (steps.items.len > cap) {
             ctx.record("orchestrator: plan exceeded max-steps");
+            ctx.max_steps_exceeded += 1;
+            ctx.log("[orchestrator] plan ({d} steps) exceeded --max-steps {d}; aborting decomposition", .{ steps.items.len, cap });
             return false;
         }
     }

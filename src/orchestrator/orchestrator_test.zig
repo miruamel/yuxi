@@ -28,4 +28,8 @@ test "engine.run aborts on a plan exceeding max-steps before codegen" {
     try std.testing.expect(!fs.fileExists(final_path));
     try std.testing.expect(ctx.deploys == 0);
     try std.testing.expect(ctx.critic_rejections == 0);
+    // The abort is a deliberate safety-cap hit, not a generic failure: the
+    // distinct counter distinguishes it in the health verdict / next-cycle
+    // KB steering, so it must be set.
+    try std.testing.expect(ctx.max_steps_exceeded == 1);
 }
