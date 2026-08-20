@@ -210,7 +210,7 @@ passes and `--expect "nope"` triggers the retry path.
 ## Knowledge base (feat)
 `--kb[=DIR]` enables a persistent lesson ledger the engine learns from across
 runs — the core autonomous-evolution loop. Each run appends one line to `<DIR>`
-outcome (deployed/failed) plus degradation counters (critic_rejections, mock_fallbacks, token_budgets_exceeded); step count, deploys, retries; the orchestrator
+outcome (deployed/failed) plus degradation counters (critic_rejections, mock_fallbacks, token_budgets_exceeded, max_steps_exceeded); step count, deploys, retries; the orchestrator
 prepends prior lessons to its decomposition prompt so later runs avoid
 repeating failures. Opt-in and off by default (`Ctx.kb_path = null`): with
 `--kb` unset no file I/O occurs and every existing test/pipeline path is
@@ -238,10 +238,12 @@ numeric `critic_rej=N` counter that `recordLesson` records.
   Null by default (no cap = historical behavior). Wire: `config.kb_max_lines`
   → `Ctx.kb_max_lines` → `knowledge.injectPrompt` → `tailLessons`.
 
-`Ctx` carries six autonomy-health counters incremented at their event sites:
+`Ctx` carries seven autonomy-health counters incremented at their event sites:
 critic_rejections, mock_fallbacks, retries (self-correction rebuilds), deploys,
-network_retries (recovered HTTP retries from `http.complete`), and
-token_budgets_exceeded. `monitoring.report` emits them alongside events/tokens
+network_retries (recovered HTTP retries from `http.complete`),
+token_budgets_exceeded, and max_steps_exceeded (set when `--max-steps` aborts
+the decomposition — distinct from a generic failure). `monitoring.report` emits
+them alongside events/tokens
 so the loop can read its own effectiveness (critic reject rate, mock-fallback
 frequency, retry churn, deploy rate) without parsing event strings.
 `network_retries` is observability-only: a recovered transient network blip is
@@ -461,6 +463,14 @@ never a bare `ctx.allocator.free(e)` that leaves a dangling pointer for a later
   the counter; CLI smoke confirms the distinct WARN + exit 1.
 - `note`: carry-over items from prior cycle summaries are already landed on
   master — `ci.yml` already sets `fetch-depth: 0` + `fetch-tags: true`
+- `fix`: `recordLesson` omitted `max_steps_exceeded` (the distinct counter PR
+  #27 added to the verdict), so a `--max-steps` abort was surfaced in health
+  but NOT persisted to the KB — the next run's `injectPrompt` stayed blind to
+  an aborted decomposition (PR #28, `099ffc1`). Mirrored the
+  `token_budgets_exceeded` field in both lesson formats + doc comment;
+  `ledger_test` now asserts `max_steps_ex=1`. Also corrected the AGENTS.md
+  "six counters" note to seven and added `max_steps_exceeded` to the KB
+  feature list so the bootstrap matches the source.
   (verifies `--version` via `git describe` works in CI), and the replay
   mock-fallback fix shipped in PR #25. Don't re-attempt either.
 
