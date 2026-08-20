@@ -1,7 +1,20 @@
 # Changelog
 
-All notable changes to the Yuxi engine are recorded here. Entries group the
 ## Unreleased
+
+### Offline replay degrades to mock on exhaustion (fix, reliability, §27/§29)
+- `transport.complete` used to hard-fail the whole offline run
+  (`error.ReplayExhausted`) the moment a run needed one more LLM call than the
+  recorded transcript held — e.g. a retried attempt, a regenerated step, or a
+  longer plan than was captured. That broke the engine's own offline/CI test
+  path on any legitimate replay growth. Now, when the network backend is
+  replaying, exhaustion falls back to the deterministic `mock` for the
+  remaining calls (same resilience philosophy as the LLM circuit breaker) while
+  still logging the gap, so a genuinely misconfigured (empty) replay stays
+  visible. `ctx.mock_fallbacks` is incremented so the autonomy-health counters
+  already track it. `transport_test` now asserts the fallback (no error,
+  `mock_fallbacks` +1) past a short transcript.
+
 
 ## v0.3.0 (2026-08-20)
 

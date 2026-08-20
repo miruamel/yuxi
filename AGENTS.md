@@ -426,7 +426,19 @@ never a bare `ctx.allocator.free(e)` that leaves a dangling pointer for a later
   `"version"` envelope field so an external gate can compare engine versions
   across deploys. `main_test` shells the binary to assert the `yuxi v…` stamp;
   `config_test` proves `--version`/`VersionRequested` is reachable. CI checkout
-  now fetches full history + tags so the stamp resolves under Actions.
+- `fix`: offline replay now degrades to `mock` on exhaustion instead of
+  hard-failing the whole offline/CI run (`transport.complete` catches
+  `error.ReplayExhausted` and falls back to `mockComplete`, incrementing
+  `ctx.mock_fallbacks`). A shorter-than-needed transcript (a retried attempt,
+  a regenerated step, a longer plan) no longer breaks the engine's own offline
+  test path; a genuinely empty replay still logs the gap. `transport_test`
+  asserts the fallback. Also synced README + `--help` with the v0.3.0 flag
+  surface (`--report`, `--health-hook`, `-V/--version`, `--tasks`, CWE-214).
+- `consult`: issue #2 (deploy-gating fork) surfaced on the issue, NOT built —
+  framed Options A (dry-run/plan mode), B (--hitl deploy gate), C (external
+  policy hook) and deferred to the co-owner. The report + health-hook plumbing
+  it would consume is already merged (v0.3.0).
+
 
 
 
