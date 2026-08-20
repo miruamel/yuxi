@@ -19,14 +19,17 @@ pub fn run(allocator: std.mem.Allocator, io: std.Io, ctx: *types.Ctx, task: []co
     defer flushRecord(allocator, ctx);
     try fs.ensureDir(allocator, ctx.workdir);
 
-    // LAYER 1: Gateway
-    if (!try gateway.run(ctx, task)) {
+    // LAYER 1: Gateway. On admission it returns the *sanitized* task (PII
+    // redacted) owned by us; downstream codegen and the KB ledger use that, not
+    // the raw input. Denied -> null, nothing runs.
+    const safe_task = (try gateway.run(ctx, task)) orelse {
         ctx.log("[engine] ABORT at gateway", .{});
         return;
-    }
+    };
+    defer allocator.free(safe_task);
     // LAYER 2: Orchestrator
     var steps = try std.ArrayList(types.Step).initCapacity(allocator, 0);
-    if (!try orchestrator.run(ctx, task, &steps)) {
+    if (!try orchestrator.run(ctx, safe_task, &steps)) {
         ctx.log("[engine] ABORT at orchestrator", .{});
         return;
     }
@@ -103,7 +106,7 @@ pub fn run(allocator: std.mem.Allocator, io: std.Io, ctx: *types.Ctx, task: []co
         knowledge.log(ctx, "task pipeline finished; nothing deployed");
     }
     if (ctx.kb_path) |_| {
-        knowledge.recordLesson(ctx, task, steps.items.len) catch |e| ctx.log("[knowledge] save failed: {s}", .{@errorName(e)});
+        knowledge.recordLesson(ctx, safe_task, steps.items.len) catch |e| ctx.log("[knowledge] save failed: {s}", .{@errorName(e)});
     }
     // LAYER 9: Monitoring — collect the autonomy-health verdict, then persist
     // it to the KB so the next cycle's injectPrompt can steer away from the

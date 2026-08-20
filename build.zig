@@ -30,12 +30,14 @@ pub fn build(b: *std.Build) void {
     const loop = b.addModule("loop", .{ .root_source_file = b.path("src/loop.zig"), .target = target, .optimize = optimize });
 
     const all = [_]*std.Build.Module{
-        types, config, compose, engine, step, gateway, orchestrator, evaluator, deploy,
-        resilience, knowledge, monitoring, fs, cache, builder, critic, transport, replay, loop,
+        types,      config,    compose,    engine, step,  gateway, orchestrator, evaluator, deploy,
+        resilience, knowledge, monitoring, fs,     cache, builder, critic,       transport, replay,
+        loop,
     };
     const all_names = [_][]const u8{
-        "types", "config", "compose", "engine", "step", "gateway", "orchestrator", "evaluator", "deploy",
-        "resilience", "knowledge", "monitoring", "fs", "cache", "builder", "critic", "transport", "replay", "loop",
+        "types",      "config",    "compose",    "engine", "step",  "gateway", "orchestrator", "evaluator", "deploy",
+        "resilience", "knowledge", "monitoring", "fs",     "cache", "builder", "critic",       "transport", "replay",
+        "loop",
     };
 
     // The dependency graph is a DAG, so wiring every module to every other
@@ -66,6 +68,7 @@ pub fn build(b: *std.Build) void {
         "src/core/selfcorr/recovery_test.zig",
         "src/critic/critic.zig",
         "src/evaluator/evaluator.zig",
+        "src/gateway/gateway_test.zig",
         "src/knowledge/knowledge_test.zig",
         "src/llm/transport.zig",
         "src/llm/transport_test.zig",
