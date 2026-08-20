@@ -162,6 +162,11 @@ pub fn assessHealth(ctx: *types.Ctx) !HealthVerdict {
         ctx.record("monitoring: health WARN token budget exceeded");
         verdict.appendSlice(ctx.allocator, "token budget exceeded; ") catch {};
     }
+    if (ctx.max_steps_exceeded > 0) {
+        ctx.log("[monitoring][health] WARN plan exceeded --max-steps {d} time(s); decomposition aborted", .{ctx.max_steps_exceeded});
+        ctx.record("monitoring: health WARN plan exceeded max-steps");
+        verdict.appendSlice(ctx.allocator, "max-steps exceeded; ") catch {};
+    }
     if (ctx.retries > 0 and ctx.deploys == 0) {
         ctx.log("[monitoring][health] WARN self-correction exhausted without a deploy", .{});
         ctx.record("monitoring: health WARN self-correction exhausted");

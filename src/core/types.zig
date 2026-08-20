@@ -66,7 +66,16 @@ pub const Ctx = struct {
     mock_fallbacks: usize,
     retries: usize,
     deploys: usize,
-    token_budgets_exceeded: usize,
+    /// Set when the orchestrator aborts a run because the decomposed plan
+    /// exceeded `--max-steps`. Distinct from `critic_rejections`: the plan was
+    /// too large to safely build autonomously, not malformed. Surfaced as its
+    /// own health-verdict clause so a deliberate fail-closed safety cap is not
+    /// misread as a generic unhealthy cycle.
+    max_steps_exceeded: usize = 0,
+    /// Set when the build aborts because the accumulated token spend crossed
+    /// `--max-tokens`. Distinct from a generic failed build (which leaves this
+    /// at 0); surfaced as its own health-verdict clause.
+    token_budgets_exceeded: usize = 0,
     network_retries: usize,
     events: std.ArrayList([]const u8),
 
@@ -89,6 +98,7 @@ pub const Ctx = struct {
             .mock_fallbacks = 0,
             .retries = 0,
             .deploys = 0,
+            .max_steps_exceeded = 0,
             .token_budgets_exceeded = 0,
             .network_retries = 0,
             .expected = null,
