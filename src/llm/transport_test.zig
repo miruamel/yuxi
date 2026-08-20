@@ -38,6 +38,42 @@ test "transport.complete serves recorded responses in order (offline replay)" {
     try std.testing.expectEqual(ctx.replay_idx, 3);
 }
 
+test "transport.complete falls back to mock when replay runs out (offline resilience)" {
+    // A shorter-than-needed transcript must not kill the offline run: after the
+    // recorded entries are exhausted, complete() degrades to the deterministic
+    // mock for the remaining calls (same resilience as the circuit breaker).
+    const allocator = std.testing.allocator;
+    const io = std.Io.Threaded.global_single_threaded.io();
+    const path = "/tmp/yuxi_replay_short.txt";
+    const file = try std.Io.Dir.createFile(std.Io.Dir.cwd(), io, path, .{});
+    defer file.close(io);
+    var buf: [1024]u8 = undefined;
+    var w = file.writer(io, &buf);
+    try w.interface.writeAll(
+        \\REPLAY_MARKER_ALPHA
+        \\---
+        \\REPLAY_MARKER_BETA
+    );
+    try w.flush();
+
+    var ctx = try types.Ctx.init(allocator, io, .empty, .no_hitl, .openai, null, "", "/tmp");
+    ctx.replay_path = path;
+
+    const a1 = try transport.complete(allocator, io, &ctx, "sys1", "user1");
+    defer allocator.free(a1);
+    try std.testing.expectEqualStrings("REPLAY_MARKER_ALPHA", a1);
+    const a2 = try transport.complete(allocator, io, &ctx, "sys2", "user2");
+    defer allocator.free(a2);
+    try std.testing.expectEqualStrings("REPLAY_MARKER_BETA", a2);
+
+    // Third call: transcript exhausted -> graceful mock fallback, no error.
+    const a3 = try transport.complete(allocator, io, &ctx, "critic", "Implement step 1: foo");
+    defer allocator.free(a3);
+    try std.testing.expectEqual(ctx.mock_fallbacks, 1);
+    // The mock builder for a non-test step emits the 2+3 stub, not a replay marker.
+    try std.testing.expect(std.mem.indexOf(u8, a3, "REPLAY_MARKER") == null);
+}
+
 test "engine.run drives the real openai backend offline via --replay" {
     const allocator = std.heap.page_allocator;
     const io = std.Io.Threaded.global_single_threaded.io();

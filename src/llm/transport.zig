@@ -16,7 +16,26 @@ pub fn complete(allocator: std.mem.Allocator, io: std.Io, ctx: *types.Ctx, syste
     // real .openai/.local path is exercisable without an API key (CI, tests).
     if (ctx.replay_path) |rp| {
         if (ctx.backend == .openai or ctx.backend == .local) {
-            return replay.replayComplete(allocator, ctx, rp);
+            // Offline replay serves recorded responses so the real network
+            // backend path runs without an API key (CI, tests). If the run
+            // needs more LLM calls than the transcript recorded (a retried
+            // attempt, a regenerated step, a longer plan), running past the
+            // last entry used to hard-fail the whole offline run. Instead we
+            // degrade to the deterministic mock for the remaining calls — the
+            // same resilience philosophy as the circuit breaker — while still
+            // logging the gap so a genuinely misconfigured (empty) replay is
+            // visible. A fully empty transcript still serves nothing and the
+            // mock then drives the run, which is the intended offline fallback.
+            if (replay.replayComplete(allocator, ctx, rp)) |out| {
+                return out;
+            } else |err| switch (err) {
+                error.ReplayExhausted => {
+                    ctx.mock_fallbacks += 1;
+                    ctx.log("[transport] replay exhausted; falling back to mock for remaining calls", .{});
+                    return mockComplete(allocator, system, user);
+                },
+                else => return err,
+            }
         }
     }
     if (ctx.cache) |c| {
