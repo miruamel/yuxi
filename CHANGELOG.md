@@ -12,6 +12,16 @@ tracked history by capability; commit hashes reference `git log`.
   deploy nothing; the completion line now reflects the actual outcome
   (deployed vs not).
 
+
+### Knowledge base / batch learning loop
+- `feat`: `--tasks` batch runs now persist an aggregate autonomy-health
+  summary to the KB (`knowledge.recordBatch`: tasks, total deploys, unhealthy
+  count). Per-run `recordLesson`/`recordHealth` already wrote one line per
+  `engine.run` cycle; this closes the gap so the next run's `injectPrompt`
+  also steers away from an *unhealthy batch shape* (e.g. every task
+  mock-fell-back, none deployed), not only from a single cycle's verdict.
+  No-op when `--kb` is unset or the batch is empty. New `knowledge_test.zig`
+  unit test + `loop_test.zig` integration test cover it.
 ### Test suite now runs (issue #3, corrected)
 - `fix`: `zig build test` now *executes* the test suite. The first issue #3
   landing made every test file its own `addTest` root (correct), but the test

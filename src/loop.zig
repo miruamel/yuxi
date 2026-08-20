@@ -2,6 +2,7 @@ const std = @import("std");
 const types = @import("types");
 const config = @import("config");
 const engine = @import("engine");
+const knowledge = @import("knowledge");
 
 pub const TaskResult = struct {
     task: []const u8,
@@ -63,5 +64,20 @@ pub fn runTasks(allocator: std.mem.Allocator, io: std.Io, environ: std.process.E
             if (r.healthy) "OK" else "UNHEALTHY",
         });
     }
+
+    // Persist the aggregate batch autonomy-health summary to the KB so the
+    // next cycle's injectPrompt learns batch shape, not only per-run verdicts.
+    if (cfg.kb_path) |kb| {
+        var total_deploys: usize = 0;
+        var total_unhealthy: usize = 0;
+        for (results.items) |r| {
+            total_deploys += r.deploys;
+            if (!r.healthy) total_unhealthy += 1;
+        }
+        const summary = try std.fmt.allocPrint(allocator, "tasks={d} deploys={d} unhealthy={d}", .{ results.items.len, total_deploys, total_unhealthy });
+        defer allocator.free(summary);
+        knowledge.recordBatch(allocator, kb, summary) catch |e| types.logLine(io, "[loop] batch kb save failed: {s}", .{@errorName(e)});
+    }
+
     return results;
 }
