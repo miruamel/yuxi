@@ -13,6 +13,7 @@ pub fn run(ctx: *types.Ctx, step: *types.Step, path: []const u8, feedback: ?[]co
     const code = transport.complete(ctx.allocator, ctx.io, ctx, sys, user) catch |e| {
         ctx.log("[builder] LLM failed: {s}; fallback to mock", .{@errorName(e)});
         resilience.fallback(ctx);
+        ctx.mock_fallbacks += 1;
         const c = try transport.complete(ctx.allocator, ctx.io, ctx, sys, user);
         return writeAndMark(ctx, step, path, c);
     };

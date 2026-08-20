@@ -21,7 +21,17 @@ tracked history by capability; commit hashes reference `git log`.
   aborts (gateway, orchestrator, plan critic, no-verify) now tail-call a new
   `finishRun` helper that runs LAYER 7-9, so every exit path records outcome +
   health. `engine.fileExists` moved to `util/fs.zig` to keep `engine.zig` under
-  the 200-SLOC invariant (§8); tests now call `fs.fileExists`.
+- `fix`: `builder.run` now increments `ctx.mock_fallbacks` when it falls back
+  to the mock backend after a transport error. It already called
+  `resilience.fallback(ctx)`, but unlike the per-step critic fallback in
+  `step.zig` it never counted the fallback — so the autonomy-health signal
+  (`monitoring.assessHealth`'s "mock fallback dominated" WARN) and
+  `knowledge.recordLesson`'s `mock_fb=N` counter under-counted builder-level
+  fallbacks, letting a mock-dominated cycle slip past the health check. The
+  fallback path now increments `ctx.mock_fallbacks`, so the signal fires
+  regardless of where the fallback originated. New `src/builder/builder_test.zig`
+  covers the fail-then-succeed seam path and is registered in `build.zig`.
+
 
 
 ### Engineering / observability
