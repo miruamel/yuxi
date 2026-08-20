@@ -75,6 +75,18 @@ pub fn build(b: *std.Build) void {
         const tmod = b.createModule(.{ .root_source_file = b.path(tf), .target = target, .optimize = optimize });
         for (all, all_names) |other, name| tmod.addImport(name, other);
         const tt = b.addTest(.{ .root_module = tmod });
-        test_step.dependOn(&tt.step);
+        // Run the test binary directly in self-managed mode rather than through
+        // the `zig_test` IPC server protocol. On aarch64 the default LLVM
+        // backend selects server mode, and its protocol pipe deadlocks when this
+        // engine test spawns child processes (the composed program's compile and
+        // run) that inherit the pipe fds. Running the binary directly (no
+        // `--listen`) is correct and avoids the deadlock.
+        const run_tt = std.Build.Step.Run.create(b, b.fmt("run {s}", .{tf}));
+        run_tt.addArtifactArg(tt);
+        // Capture output to a real file instead of inheriting the build's pipe:
+        // `global_single_threaded` stdout is mangled through the build's
+        // run-step pipe, hiding the evaluator's `[evaluator] ...` diagnostics.
+        run_tt.stdio = .inherit;
+        test_step.dependOn(&run_tt.step);
     }
 }

@@ -48,19 +48,43 @@ pub fn save(alloc: std.mem.Allocator, path: []const u8, lesson: []const u8) !voi
 /// is set. The lesson captures outcome plus the degradation counters (critic
 /// rejections, mock fallbacks, token-budget breaches) so a later run that
 /// replays prior lessons via `injectPrompt` sees *how* a prior cycle went, not
-/// just whether it deployed — closing the learning loop even when a real
-/// backend degrades.
+/// just whether it deployed. On a failed run with a captured evaluator error,
+/// the trimmed error is appended (see `errSnippet`) so the next run also learns
+/// *why* it failed — closing the learning loop for non-critic failures too,
+/// not only for critic rejections (`recordCritic`).
 pub fn recordLesson(ctx: *types.Ctx, task: []const u8, steps: usize) !void {
     if (ctx.kb_path) |kb| {
         const outcome = if (ctx.deploys > 0) "deployed" else "failed";
-        const lesson = try std.fmt.allocPrint(
-            ctx.allocator,
-            "- {s}: {s} (steps={d} deploys={d} retries={d} critic_rej={d} mock_fb={d} budget_ex={d})",
-            .{ task, outcome, steps, ctx.deploys, ctx.retries, ctx.critic_rejections, ctx.mock_fallbacks, ctx.token_budgets_exceeded },
-        );
+        const err = if (ctx.deploys == 0) errSnippet(ctx) else null;
+        defer if (err) |e| ctx.allocator.free(e);
+        const lesson = if (err) |e|
+            try std.fmt.allocPrint(
+                ctx.allocator,
+                "- {s}: {s} (steps={d} deploys={d} retries={d} critic_rej={d} mock_fb={d} budget_ex={d}) error=\"{s}\"",
+                .{ task, outcome, steps, ctx.deploys, ctx.retries, ctx.critic_rejections, ctx.mock_fallbacks, ctx.token_budgets_exceeded, e },
+            )
+        else
+            try std.fmt.allocPrint(
+                ctx.allocator,
+                "- {s}: {s} (steps={d} deploys={d} retries={d} critic_rej={d} mock_fb={d} budget_ex={d})",
+                .{ task, outcome, steps, ctx.deploys, ctx.retries, ctx.critic_rejections, ctx.mock_fallbacks, ctx.token_budgets_exceeded },
+            );
         defer ctx.allocator.free(lesson);
         try save(ctx.allocator, kb, lesson);
     }
+}
+
+/// Cap the captured evaluator error to a short, KB-readable snippet so failed
+/// lessons stay consumable. Returns null for an absent or empty error.
+/// ponytail: 240-byte prefix; upgrade to first-N-lines if multiline context
+/// proves worth keeping in the ledger.
+fn errSnippet(ctx: *types.Ctx) ?[]const u8 {
+    const raw = ctx.eval_error orelse return null;
+    const trimmed = std.mem.trim(u8, raw, &std.ascii.whitespace);
+    if (trimmed.len == 0) return null;
+    const cap: usize = 240;
+    const slice = if (trimmed.len <= cap) trimmed else trimmed[0..cap];
+    return ctx.allocator.dupe(u8, slice) catch null;
 }
 /// Persist a qualitative critic-rejection lesson when a KB is configured.
 /// Unlike the numeric summary in `recordLesson`, this captures the *reason*

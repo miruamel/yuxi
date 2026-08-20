@@ -30,7 +30,6 @@ pub fn run(ctx: *types.Ctx, path: []const u8) !bool {
     }
     ctx.log("[evaluator] compile OK", .{});
 
-    // Run the compiled artifact; the step is accepted only if it runs cleanly.
     const run_argv = [_][]const u8{bin_path};
     const ran = switch (try runTo(ctx, &run_argv, out_path)) {
         .exited => |code| code == 0,
@@ -74,16 +73,28 @@ fn readOut(allocator: std.mem.Allocator, path: []const u8) ![]u8 {
 }
 
 /// Spawn a child, redirecting both stdout and stderr to `out_path`, and wait.
+/// `ctx.io` is the global single-threaded Io whose `allocator` field is
+/// `.failing` (see `std.Io.Threaded.init_single_threaded`), so passing it to
+/// `std.process.spawn` OOMs on the argv/env arena. A per-call `Threaded`
+/// backed by `ctx.allocator` (a real allocator) has a working allocator and is
+/// safe for the spawn and the output-file redirect. The `environ` is taken from
+/// `global_single_threaded` (the real OS environment): `spawnPosix` uses the
+/// Threaded instance's own environ when `SpawnOptions.environ_map` is null, and
+/// a default-initialized `Threaded` has an *empty* environ, which makes the
+/// child `zig` fail with `AppDataDirUnavailable`.
 fn runTo(ctx: *types.Ctx, argv: []const []const u8, out_path: []const u8) !std.process.Child.Term {
-    const out_file = try std.Io.Dir.createFile(std.Io.Dir.cwd(), ctx.io, out_path, .{ .truncate = true });
-    defer out_file.close(ctx.io);
-    var child = try std.process.spawn(ctx.io, .{
+    var threaded = std.Io.Threaded.init(ctx.allocator, .{ .environ = std.Io.Threaded.global_single_threaded.environ.process_environ });
+    defer threaded.deinit();
+    const io = threaded.io();
+    const out_file = try std.Io.Dir.createFile(std.Io.Dir.cwd(), io, out_path, .{ .truncate = true });
+    var child = try std.process.spawn(io, .{
         .argv = argv,
         .stdin = .ignore,
         .stdout = .{ .file = out_file },
         .stderr = .{ .file = out_file },
     });
-    return try child.wait(ctx.io);
+    const term = try child.wait(io);
+    return term;
 }
 
 fn cleanup(ctx: *types.Ctx, bin_path: []const u8, out_path: []const u8) void {
@@ -94,11 +105,11 @@ fn cleanup(ctx: *types.Ctx, bin_path: []const u8, out_path: []const u8) void {
     if (o_path.len > 0) std.Io.Dir.deleteFile(std.Io.Dir.cwd(), ctx.io, o_path) catch {};
 }
 test "evaluator.run gates deploy on compile+run" {
-    const allocator = std.testing.allocator;
+    const allocator = std.heap.page_allocator;
     const io = std.Io.Threaded.global_single_threaded.io();
     const cwd = std.Io.Dir.cwd();
 
-    const good = "eval_test_good.zig";
+    const good = "/tmp/eval_test_good.zig";
     {
         const file = try std.Io.Dir.createFile(cwd, io, good, .{});
         defer file.close(io);
@@ -118,7 +129,7 @@ test "evaluator.run gates deploy on compile+run" {
     try std.testing.expect(try run(&ctx, good));
     try std.testing.expect(ctx.eval_error == null);
 
-    const bad = "eval_test_bad.zig";
+    const bad = "/tmp/eval_test_bad.zig";
     {
         const file = try std.Io.Dir.createFile(cwd, io, bad, .{});
         defer file.close(io);
@@ -130,15 +141,16 @@ test "evaluator.run gates deploy on compile+run" {
     defer std.Io.Dir.deleteFile(cwd, io, bad) catch {};
 
     try std.testing.expect(!(try run(&ctx, bad)));
-    if (ctx.eval_error) |e| ctx.allocator.free(e);
+    ctx.clearEvalError();
     // Behavioral verification: a matching expected output passes; a mismatch fails.
-    const spec = "eval_test_spec.zig";
+    const spec = "/tmp/eval_test_spec.zig";
     {
         const file = try std.Io.Dir.createFile(cwd, io, spec, .{});
         defer file.close(io);
         var buf: [1024]u8 = undefined;
         var w = file.writer(io, &buf);
         try w.interface.writeAll(
+            \\const std = @import("std");
             \\pub fn main() void {
             \\    std.debug.print("hello", .{});
             \\}
@@ -153,7 +165,7 @@ test "evaluator.run gates deploy on compile+run" {
     try std.testing.expect(!(try run(&ctx, spec)));
     if (ctx.eval_error) |e| {
         try std.testing.expect(std.mem.indexOf(u8, e, "expected") != null);
-        ctx.allocator.free(e);
+        ctx.clearEvalError();
     }
     ctx.expected = null;
 }

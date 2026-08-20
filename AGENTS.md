@@ -161,36 +161,54 @@ Flat imports from `src/`: `@import("core/types.zig")`, not `../core/types.zig`.
 ## Test runner (module-name imports)
 `zig build test` runs every `test` block in the tree. Zig 0.16 only collects
 `test` blocks from the **root module** of a test build, so a single aggregator
-file can't pull in other files' tests. Fix (issue #3, landed): every source
-file is a public named module (`@import("types")`, registered in `build.zig`),
-and each test-bearing file is its own `addTest` root. Sub-directory test files
-cannot be roots with relative `../` imports (they escape the module path),
-which is why imports are by name. The dependency graph is a DAG, so `build.zig`
-wires every module to every other (except itself) — no per-file import list to
-maintain. To add a test, drop a `test` block in the relevant file and list the
-file in `build.zig`'s `test_files`. CI green now means tests actually passed.
+file can't pull in other files' tests. Every source file is a public named
+module (`@import("types")`, registered in `build.zig`), and each test-bearing
+file is its own `addTest` root wired with the all-to-all module imports (the
+dependency graph is a DAG, so no per-file import list is needed). Sub-directory
+test files can't be roots with relative `../` imports (they escape the module
+path), which is why imports are by name.
 
-## Known gaps (next cycles)
-- Gateway rate-limit removed (fork #1 resolved): `main.zig` runs one task then
-  exits, so a per-process counter is unreachable dead code. Removed from
-  `src/gateway/gateway.zig`. Reintroduce a real limiter only if a service mode
-  is added.
-- Remote `miruamel/yuxi` (public) provisioned; `master` pushed, CI green on push to
-  `master`/`main`. Release tagging still batched per §28 (no tag cut yet).
-- The engine now composes every step into ONE runnable program (`gen_final.zig`):
-  each step emits a `pub fn stepN() void` fragment, the engine merges them under a
-  `main` harness, and the evaluator compiles+runs the single artifact. Deploy gates
-  on a clean compile+run; one artifact per task, not N disconnected files.
-- Evaluator has a regression test (`src/evaluator/evaluator.zig`): a compiling
-  program is accepted and a non-compiling one is rejected, via a real
-  `zig build-exe` + run using the pre-initialized `std.Io.Threaded.global_single_threaded`
-  host Io (avoids allocating an Io, which would panic under `zig build test`'s
-  failing-allocator re-run). `src/tests.zig` is the test root, so `zig build test`
-  covers cache, evaluator, engine composition, and three engine-level integration
-  tests in `src/core/selfcorr_test.zig`: self-correction recovery (fail-first
-  injected backend), critic denylist block (process-spawning code never deploys),
-  and token-budget abort (`--max-tokens 1`). All use the `Ctx.llm_fn` seam or the
-  mock backend — no network, deterministic.
+**Gotcha 1 — false-green (issue #3):** `b.addTest` returns a *compile* step.
+Depending only on `tt.step` compiles the tests but never *runs* them — `zig
+build test` exits 0 while no test executes. You MUST `addRunArtifact(tt)` and
+depend on `run_tt.step` so the binaries actually execute; then a failing test
+fails the build. CI green genuinely means the tests ran and passed.
+
+**Gotcha 2 — `zig_test` IPC deadlock (aarch64):** `addRunArtifact(tt)` for a
+test artifact injects `--listen=-` and switches to the `zig_test` server
+protocol. On aarch64 with the default LLVM backend the protocol pipe deadlocks
+(the engine test spawns child processes that inherit the pipe fds). Run test
+binaries **directly** instead: build with `b.addTest`, then `const run_tt =
+std.Build.Step.Run.create(b, ...); run_tt.addArtifactArg(tt);
+run_tt.stdio = .inherit;`. That executes the self-managed binary (no
+`--listen`) and checks the exit code. Don't use `use_llvm = false` to dodge
+this — the self-hosted aarch64 backend is far too slow for 13 roots.
+
+**Gotcha 3 — child processes need a real allocator AND a real environment:**
+`evaluator.runTo` spawns `zig build-exe` via `std.process.spawn`. It must NOT
+use `ctx.io` (`std.Io.Threaded.global_single_threaded`): that Io's allocator
+is `.failing` (see `init_single_threaded`), so the argv/env arena alloc OOMs.
+Create a per-call `std.Io.Threaded.init(ctx.allocator, .{ .environ =
+std.Io.Threaded.global_single_threaded.environ.process_environ })` — a real
+allocator for the spawn, and the real OS environment (a default-initialized
+`Threaded` has an *empty* environ, which makes the child `zig` fail with
+`AppDataDirUnavailable` because it can't resolve its cache dir). Unit tests
+that spawn `zig` must pass real environment too (or absolute paths + a real
+env), never rely on an inherited-empty one.
+
+**Speed:** each root recompiles its module graph, so the full suite is slow on
+this environment (~20-40s/root, ~4-7 min total). Give local/CI runs enough
+wall time; don't shrink `test_files` to fit a tighter timeout. To add a test,
+drop a `test` block in the relevant file and list the file in `build.zig`'s
+`test_files`.
+
+**Unit-test hygiene:** tests that call `evaluator.run` (or `engine.run`)
+intentionally leave `ctx.events` / `ctx.eval_error` allocated at exit (the CLI
+owns those). In a unit test use `std.heap.page_allocator` (not
+`std.testing.allocator`) so the DebugAllocator leak check doesn't false-fail;
+and free `eval_error` via `ctx.clearEvalError()` (which nulls the field),
+never a bare `ctx.allocator.free(e)` that leaves a dangling pointer for a later
+`clearEvalError` to double-free.
 - Real LLM backends (`.openai`/`.local`) shell `curl` (`transport.httpComplete`); `curl`
   must be on PATH at runtime. `extractContent` unescapes JSON `\n`/`\t` so multi-line
   generated code survives the OpenAI response — a regression test now guards this.

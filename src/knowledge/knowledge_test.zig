@@ -80,6 +80,25 @@ test "knowledge recordLesson writes an enriched per-run lesson" {
     try std.testing.expect(std.mem.indexOf(u8, got, "mock_fb=1") != null);
 }
 
+test "knowledge recordLesson appends the eval error on a failed run" {
+    const alloc = std.testing.allocator;
+    const io = std.Io.Threaded.global_single_threaded.io();
+    const base = "/tmp/yuxi_kb_failed_test";
+    const path = try std.fmt.allocPrint(alloc, "{s}/kb.md", .{base});
+    defer alloc.free(path);
+    defer std.Io.Dir.deleteTree(std.Io.Dir.cwd(), io, base) catch {};
+    var ctx = try types.Ctx.init(alloc, io, .empty, .no_hitl, .mock, null, "", base);
+    ctx.kb_path = path;
+    ctx.deploys = 0;
+    ctx.setEvalError("error: cannot find 'foo' in this scope");
+    defer ctx.clearEvalError();
+    try knowledge.recordLesson(&ctx, "add a feature", 3);
+    const got = (try knowledge.load(alloc, path)).?;
+    defer alloc.free(got);
+    try std.testing.expect(std.mem.indexOf(u8, got, "add a feature: failed") != null);
+    try std.testing.expect(std.mem.indexOf(u8, got, "cannot find 'foo'") != null);
+}
+
 test "knowledge recordCritic writes a qualitative lesson" {
     const alloc = std.testing.allocator;
     const io = std.Io.Threaded.global_single_threaded.io();

@@ -12,18 +12,39 @@ tracked history by capability; commit hashes reference `git log`.
   deploy nothing; the completion line now reflects the actual outcome
   (deployed vs not).
 
-### Test suite now runs (issue #3 resolved)
-- `fix`: `zig build test` executes the real test suite. Every source file is a
-  public named module (`@import("types")`, registered in `build.zig`) and each
-  test-bearing file is its own `addTest` root, so Zig 0.16's root-only test
-  collection no longer drops them. The module-name import refactor (all
-  `@import` paths → names) plus per-file test roots landed. CI green now means
-  tests actually passed, not that nothing ran. The refactor also surfaced and
-  fixed latent Zig 0.16 `std.Io` API mismatches the previously-vacuous suite
-  had hidden: `file.close(io)` (1-arg), `w.interface.writeAll` + `w.flush()`,
-  `_ = std.os.linux.close(fd)`, `var frags` slice coercion in the compose
-  test, and complete `config.Config` literals (added `--kb`/`--replay`/`--record`
-  fields).
+### Test suite now runs (issue #3, corrected)
+- `fix`: `zig build test` now *executes* the test suite. The first issue #3
+  landing made every test file its own `addTest` root (correct), but the test
+  step depended only on the `addTest` **compile** step — so `zig build test`
+  compiled every root and exited 0 while **no test ever ran** (a silent
+  false-green that persisted into CI). The fix wraps each `addTest` with
+  `addRunArtifact` and depends on the **run** step, so a failing test now fails
+  the build. The module-name import refactor (all `@import` paths → names) plus
+  per-file test roots landed earlier. That refactor surfaced and fixed latent
+  Zig 0.16 `std.Io` API mismatches the vacuous suite had hidden: `file.close(io)`
+  (1-arg), `w.interface.writeAll` + `w.flush()`, `_ = std.os.linux.close(fd)`,
+  `var frags` slice coercion in the compose test, and complete `config.Config`
+  literals (added `--kb`/`--replay`/`--record` fields).
+- `chore`: the full suite is slow on this environment (~40-80s/root, each root
+  recompiles its module graph) — CI must allow the wall time; don't shrink
+- `fix`: the engine integration test now actually deploys. Two Zig 0.16
+  runtime traps were masked by the vacuous suite and then by the IPC hang:
+  (1) `evaluator.runTo` must spawn `zig` with a real allocator *and* the real
+  OS environment — `ctx.io` (`global_single_threaded`) has a `.failing`
+  allocator (OOM on argv) and a default `Threaded` has an *empty* environ
+  (child `zig` dies with `AppDataDirUnavailable`). `runTo` now builds a per-call
+  `Threaded.init(ctx.allocator, .{ .environ = global_single_threaded.environ.process_environ })`.
+  (2) On aarch64 the default `addRunArtifact(tt)` selects the `zig_test` server
+  protocol whose pipe deadlocks when the engine test spawns children, so the
+  build hung forever. Test binaries now run **directly** (`Step.Run.create` +
+  `addArtifactArg(tt)` + `stdio = .inherit`, no `--listen`).
+- `test`: the evaluator unit test (`evaluator.run gates deploy on compile+run`)
+  was itself broken — invalid Zig in the `spec` fixture (missing `std` import /
+  missing `w.flush()` left an empty file), a bare `ctx.allocator.free(e)` that
+  double-freed `eval_error`, and `std.testing.allocator` reporting the
+  intentional exit-time `ctx.events`/`eval_error` as leaks. Switched to absolute
+  `/tmp` fixture paths, `clearEvalError()`, and `page_allocator`. All 13 test
+  roots now pass (`zig build test` exits 0).
 
 ### Knowledge base: durable critic lessons (feat)
 - `feat`: the KB now persists **qualitative critic-rejection reasons**, not just
@@ -34,6 +55,14 @@ tracked history by capability; commit hashes reference `git log`.
   `recordCritic` unit test plus an end-to-end assertion in `recovery_test.zig`
   (the reject→regenerate→approve branch) that the reason lands in the KB.
 
+
+### Knowledge base: failed-run error captured (feat)
+- `feat`: `knowledge.recordLesson` now appends a trimmed `error="…"` snippet
+  when a run fails (`ctx.deploys == 0`) and `ctx.eval_error` is set, so the next
+  run's injected lessons explain *why* a prior run failed — not just the numeric
+  `failed` outcome. Closes the learning loop for non-critic failures too
+  (complementary to `recordCritic`'s qualitative critic reasons). New unit test
+  in `knowledge_test.zig`.
 ## v0.1.0 (2026-08-19)
 
 First tagged release of the Yuxi (玉溪) autonomous software-evolution engine,
