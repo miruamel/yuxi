@@ -17,7 +17,13 @@ tracked history by capability; commit hashes reference `git log`.
   returns the owned redacted slice; `engine.run` uses it for `orchestrator.run`
   and `knowledge.recordLesson` and frees it. Denial (short task / empty
   `AE_TOKEN`) returns `null` and nothing runs. New `gateway_test.zig` covers
-  both the admission path and the redaction output.
+- `fix`(security): the redactor still leaked email domains. `redact` only
+  replaced the `@` glyph and swallowed the rest of the @-run, so
+  `user@corp.com` became `user<redacted>corp.com` — the domain stayed visible.
+  `redact` now replaces the entire whitespace-delimited token containing `@`
+  (`user@corp.com` -> `<redacted>`), preferring over-redaction at the trust
+  boundary. `gateway_test.zig` now also asserts the whole-email token is
+  removed and a non-PII task passes through unchanged.
 
 ### Knowledge base / batch learning loop
 - `feat`: `--tasks` batch runs now persist an aggregate autonomy-health
