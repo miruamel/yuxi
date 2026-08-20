@@ -102,6 +102,23 @@ pub fn recordCritic(ctx: *types.Ctx, step_name: []const u8, reason: []const u8) 
     }
 }
 
+/// Persist the end-of-run autonomy-health verdict to the configured knowledge
+/// base when one is set. Unlike the per-run `recordLesson` (outcome + numeric
+/// counters) and `recordCritic` (rejected shapes), this captures the
+/// qualitative *health* signal the monitoring layer computed — so a future
+/// run's `injectPrompt` can also steer away from an *unhealthy cycle shape*
+/// (e.g. mock-dominated, budget-exhausted), not only from a specific failure
+/// or a rejected step. No-op when no KB is configured, or when the verdict is
+/// empty (a healthy cycle has nothing to learn).
+pub fn recordHealth(ctx: *types.Ctx, verdict: []const u8) !void {
+    if (ctx.kb_path) |kb| {
+        if (verdict.len == 0) return;
+        const lesson = try std.fmt.allocPrint(ctx.allocator, "- health: {s}", .{verdict});
+        defer ctx.allocator.free(lesson);
+        try save(ctx.allocator, kb, lesson);
+    }
+}
+
 /// Build the decomposition user-prompt, prepending prior lessons from the
 /// configured knowledge base when present. Caller owns the returned string.
 pub fn injectPrompt(ctx: *types.Ctx, task: []const u8) ![]const u8 {

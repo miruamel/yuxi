@@ -36,7 +36,7 @@ evolution engine described in `DESIGN.md`.
 
 ## Architecture (`src/`)
 - `main.zig` — entry; loads config, optional `--cache`, builds `Ctx`, runs engine.
-- `core/{types,config,engine}.zig` — `Ctx` state, CLI parse, the 9-layer loop.
+- `core/{types,config,engine,compose}.zig` — `Ctx` state, CLI parse, the 9-layer loop, fragment composition.
 - `llm/transport.zig` — single LLM entry `complete(...)`. Backends: mock (offline),
   openai (`OPENAI_BASE`/`OPENAI_API_KEY`), local (ollama `LOCAL_BASE`).
 - `gateway orchestrator builder critic evaluator deploy resilience knowledge monitoring`
@@ -115,9 +115,16 @@ repeating failures. Opt-in and off by default (`Ctx.kb_path = null`): with
 `--kb` unset no file I/O occurs and every existing test/pipeline path is
 unchanged. The mock backend ignores injected context, so prompt shape never
 affects mock output (and the engine test stays green).
-Critic `REJECT` reasons are now persisted too (`knowledge.recordCritic`), so
+Critic `REJECT` reasons are persisted too (`knowledge.recordCritic`), so
 future decompositions can steer away from the rejected shape — not only the
 numeric `critic_rej=N` counter that `recordLesson` records.
+- **Health-verdict loop (feat):** `monitoring.assessHealth` now returns the
+  accumulated autonomy-health verdict (e.g. `no deploy; self-correction
+  exhausted; `) instead of only logging it. `engine.run` persists that verdict
+  to the KB via `knowledge.recordHealth` on an unhealthy cycle, so the next
+  run's `injectPrompt` also steers away from an *unhealthy cycle shape*
+  (mock-dominated, budget-exhausted) — not only from a fixed failure or a
+  rejected step. A healthy cycle produces no health lesson.
 
 ## Run metrics (observability, feat)
 `Ctx` carries five autonomy-health counters incremented at their event

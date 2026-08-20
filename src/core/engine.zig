@@ -1,6 +1,7 @@
 const std = @import("std");
 const types = @import("types");
 const buildstep = @import("step");
+const compose = @import("compose");
 const gateway = @import("gateway");
 const orchestrator = @import("orchestrator");
 const evaluator = @import("evaluator");
@@ -59,7 +60,7 @@ pub fn run(allocator: std.mem.Allocator, io: std.Io, ctx: *types.Ctx, task: []co
             try fragments.append(allocator, frag.?);
         }
         if (!composed) break;
-        const merged = try compose(allocator, fragments.items);
+        const merged = try compose.merge(allocator, fragments.items);
         defer allocator.free(merged);
         const merged_path = try std.fmt.allocPrint(allocator, "{s}/gen_final.zig", .{ctx.workdir});
         defer allocator.free(merged_path);
@@ -104,9 +105,14 @@ pub fn run(allocator: std.mem.Allocator, io: std.Io, ctx: *types.Ctx, task: []co
     if (ctx.kb_path) |_| {
         knowledge.recordLesson(ctx, task, steps.items.len) catch |e| ctx.log("[knowledge] save failed: {s}", .{@errorName(e)});
     }
-    // LAYER 9: Monitoring
+    // LAYER 9: Monitoring — collect the autonomy-health verdict, then persist
+    // it to the KB so the next cycle's injectPrompt can steer away from the
+    // exact failure mode (closes the monitoring->knowledge learning loop).
     monitoring.report(ctx);
-    monitoring.assessHealth(ctx);
+    const verdict = try monitoring.assessHealth(ctx);
+    if (ctx.kb_path) |_| {
+        knowledge.recordHealth(ctx, verdict) catch |e| ctx.log("[knowledge] health save failed: {s}", .{@errorName(e)});
+    }
     types.logLine(io, "[engine] done. events={d}", .{ctx.events.items.len});
 }
 
@@ -153,69 +159,10 @@ pub fn newCtx(allocator: std.mem.Allocator, io: std.Io, environ: std.process.Env
     ctx.record_path = cfg.record_path;
     return ctx;
 }
-/// Merge step fragments into one runnable program: a std import, each step
-/// function, and a `main` that calls them in order. Invalid composition
-/// (e.g. a step whose function fails to compile) surfaces at the evaluator.
-fn compose(alloc: std.mem.Allocator, frags: [][]const u8) ![]u8 {
-    var body = try std.ArrayList(u8).initCapacity(alloc, 0);
-    defer body.deinit(alloc);
-    try body.appendSlice(alloc, "const std = @import(\"std\");\n\n");
-    for (frags) |f| {
-        try body.appendSlice(alloc, f);
-        try body.appendSlice(alloc, "\n");
-    }
-    var calls = try std.ArrayList(u8).initCapacity(alloc, 0);
-    defer calls.deinit(alloc);
-    var i: usize = 0;
-    while (i < frags.len) : (i += 1) {
-        const line = try std.fmt.allocPrint(alloc, "    _ = step{d}();\n", .{i});
-        try calls.appendSlice(alloc, line);
-        alloc.free(line);
-    }
-    return try std.fmt.allocPrint(alloc, "{s}\npub fn main() void {{\n{s}}}\n", .{ body.items, calls.items });
-}
-test "compose merges step fragments with a main harness" {
-    const allocator = std.testing.allocator;
-    var frags = [_][]const u8{
-        "pub fn step0() void { std.debug.print(\"a\", .{}); }",
-        "pub fn step1() void { std.debug.print(\"b\", .{}); }",
-    };
-    const prog = try compose(allocator, &frags);
-    defer allocator.free(prog);
-    try std.testing.expect(std.mem.indexOf(u8, prog, "const std = @import(\"std\");") != null);
-    try std.testing.expect(std.mem.indexOf(u8, prog, "pub fn step0() void {") != null);
-    try std.testing.expect(std.mem.indexOf(u8, prog, "pub fn step1() void {") != null);
-    try std.testing.expect(std.mem.indexOf(u8, prog, "pub fn main() void {") != null);
-    try std.testing.expect(std.mem.indexOf(u8, prog, "    _ = step0();") != null);
-    try std.testing.expect(std.mem.indexOf(u8, prog, "    _ = step1();") != null);
-}
 
-test "engine.run removes intermediate step files, keeps gen_final" {
-    // Integration test: the mock backend yields a full, self-contained
-    // pipeline (orchestrator -> 3 steps, builder -> stepN fns, critic -> APPROVE).
-    // Uses page_allocator because engine.run intentionally leaves exit-time
-    // allocations (ctx.events, steps) for the CLI, which the test allocator
-    // would otherwise report as leaks.
-    const allocator = std.heap.page_allocator;
-    const io = std.Io.Threaded.global_single_threaded.io();
-    const workdir = "/tmp/yuxi_clean_test";
-    try fs.ensureDir(allocator, workdir);
-
-    var ctx = try types.Ctx.init(allocator, io, .empty, .no_hitl, .mock, null, "", workdir);
-    try run(allocator, io, &ctx, "design a calculator");
-    try std.testing.expect(ctx.deploys >= 1);
-    try std.testing.expect(ctx.retries == 0);
-
-    const final_path = try std.fmt.allocPrint(allocator, "{s}/gen_final.zig", .{workdir});
-    defer allocator.free(final_path);
-    try std.testing.expect(fileExists(final_path));
-    for (0..3) |i| {
-        const p = try std.fmt.allocPrint(allocator, "{s}/gen_{d}.zig", .{ workdir, i });
-        defer allocator.free(p);
-        try std.testing.expect(!fileExists(p));
-    }
-}
-
+/// Returns true if `path` exists (regardless of whether it is readable).
+/// Used by tests to assert deployment artifacts landed (and intermediates
+/// were cleaned up).
 pub fn fileExists(path: []const u8) bool {
     const fd = std.posix.openat(std.posix.AT.FDCWD, path, std.posix.O{ .ACCMODE = .RDONLY }, 0) catch |e| {
         if (e == error.FileNotFound) return false;

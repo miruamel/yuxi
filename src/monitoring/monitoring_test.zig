@@ -15,22 +15,13 @@ test "monitoring.assessHealth warns on an unhealthy cycle" {
     ctx.retries = 1;
     ctx.deploys = 0;
     ctx.token_budgets_exceeded = 1;
-    monitoring.assessHealth(&ctx);
+    const verdict = try monitoring.assessHealth(&ctx);
+    defer if (verdict.len > 0) allocator.free(verdict);
 
-    var no_deploy = false;
-    var budget = false;
-    var exhausted = false;
-    var mock_dom = false;
-    for (ctx.events.items) |e| {
-        if (std.mem.indexOf(u8, e, "monitoring: health WARN no deploy") != null) no_deploy = true;
-        if (std.mem.indexOf(u8, e, "monitoring: health WARN token budget exceeded") != null) budget = true;
-        if (std.mem.indexOf(u8, e, "monitoring: health WARN self-correction exhausted") != null) exhausted = true;
-        if (std.mem.indexOf(u8, e, "monitoring: health WARN mock fallback dominated") != null) mock_dom = true;
-    }
-    try std.testing.expect(no_deploy);
-    try std.testing.expect(budget);
-    try std.testing.expect(exhausted);
-    try std.testing.expect(mock_dom);
+    try std.testing.expect(std.mem.indexOf(u8, verdict, "no deploy") != null);
+    try std.testing.expect(std.mem.indexOf(u8, verdict, "token budget exceeded") != null);
+    try std.testing.expect(std.mem.indexOf(u8, verdict, "self-correction exhausted") != null);
+    try std.testing.expect(std.mem.indexOf(u8, verdict, "mock fallback dominated") != null);
 }
 
 test "monitoring.assessHealth is silent on a healthy cycle" {
@@ -42,8 +33,9 @@ test "monitoring.assessHealth is silent on a healthy cycle" {
 
     var ctx = try types.Ctx.init(allocator, io, .empty, .no_hitl, .mock, null, "", workdir);
     ctx.deploys = 1;
-    monitoring.assessHealth(&ctx);
-
+    const verdict = try monitoring.assessHealth(&ctx);
+    defer if (verdict.len > 0) allocator.free(verdict);
+    try std.testing.expectEqualStrings("", verdict);
     for (ctx.events.items) |e| {
         try std.testing.expect(std.mem.indexOf(u8, e, "monitoring: health WARN") == null);
     }

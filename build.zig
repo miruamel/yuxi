@@ -10,6 +10,7 @@ pub fn build(b: *std.Build) void {
     // directory, so all imports use module names. `addModule` registers the
     // module; each consumer must `addImport` it (no implicit global scope).
     const types = b.addModule("types", .{ .root_source_file = b.path("src/core/types.zig"), .target = target, .optimize = optimize });
+    const compose = b.addModule("compose", .{ .root_source_file = b.path("src/core/compose.zig"), .target = target, .optimize = optimize });
     const config = b.addModule("config", .{ .root_source_file = b.path("src/core/config.zig"), .target = target, .optimize = optimize });
     const engine = b.addModule("engine", .{ .root_source_file = b.path("src/core/engine.zig"), .target = target, .optimize = optimize });
     const step = b.addModule("step", .{ .root_source_file = b.path("src/core/step.zig"), .target = target, .optimize = optimize });
@@ -29,11 +30,11 @@ pub fn build(b: *std.Build) void {
     const loop = b.addModule("loop", .{ .root_source_file = b.path("src/loop.zig"), .target = target, .optimize = optimize });
 
     const all = [_]*std.Build.Module{
-        types, config, engine, step, gateway, orchestrator, evaluator, deploy,
+        types, config, compose, engine, step, gateway, orchestrator, evaluator, deploy,
         resilience, knowledge, monitoring, fs, cache, builder, critic, transport, replay, loop,
     };
     const all_names = [_][]const u8{
-        "types", "config", "engine", "step", "gateway", "orchestrator", "evaluator", "deploy",
+        "types", "config", "compose", "engine", "step", "gateway", "orchestrator", "evaluator", "deploy",
         "resilience", "knowledge", "monitoring", "fs", "cache", "builder", "critic", "transport", "replay", "loop",
     };
 
@@ -60,6 +61,7 @@ pub fn build(b: *std.Build) void {
         "src/loop_test.zig",
         "src/builder/builder.zig",
         "src/core/engine.zig",
+        "src/core/compose.zig",
         "src/core/selfcorr/gate_test.zig",
         "src/core/selfcorr/recovery_test.zig",
         "src/critic/critic.zig",

@@ -25,8 +25,9 @@ tracked history by capability; commit hashes reference `git log`.
   (1-arg), `w.interface.writeAll` + `w.flush()`, `_ = std.os.linux.close(fd)`,
   `var frags` slice coercion in the compose test, and complete `config.Config`
   literals (added `--kb`/`--replay`/`--record` fields).
-- `chore`: the full suite is slow on this environment (~40-80s/root, each root
+- `chore`: the full suite is slow on this environment (~20-40s/root, each root
   recompiles its module graph) — CI must allow the wall time; don't shrink
+  `test_files` to fit a tighter timeout.
 - `fix`: the engine integration test now actually deploys. Two Zig 0.16
   runtime traps were masked by the vacuous suite and then by the IPC hang:
   (1) `evaluator.runTo` must spawn `zig` with a real allocator *and* the real
@@ -44,7 +45,18 @@ tracked history by capability; commit hashes reference `git log`.
   double-freed `eval_error`, and `std.testing.allocator` reporting the
   intentional exit-time `ctx.events`/`eval_error` as leaks. Switched to absolute
   `/tmp` fixture paths, `clearEvalError()`, and `page_allocator`. All 13 test
-  roots now pass (`zig build test` exits 0).
+- `refactor`: `engine.compose` extracted to `src/core/compose.zig` (`compose.merge`),
+  bringing `engine.zig` back under the 200-SLOC hard invariant (§8) and freeing
+  `core/`'s 5-file cap. The compose unit test moved with it; `build.zig` registers
+  `compose` as a named module and adds it as a 14th test root.
+- `feat`: the autonomy-health verdict now closes the learning loop. `monitoring.assessHealth`
+  returns the accumulated verdict (e.g. `no deploy; self-correction exhausted; `)
+  instead of only logging it; `engine.run` persists it to the KB via the new
+  `knowledge.recordHealth` on an unhealthy cycle, so a later run's `injectPrompt`
+  also steers away from an *unhealthy cycle shape* (mock-dominated, budget-exhausted)
+  — not only a fixed failure or a rejected step (`recordLesson` / `recordCritic`).
+  A healthy cycle writes no health lesson. New unit tests in `monitoring_test.zig`
+  (asserted verdict) and `knowledge_test.zig` (persist + no-op).
 
 ### Knowledge base: durable critic lessons (feat)
 - `feat`: the KB now persists **qualitative critic-rejection reasons**, not just
