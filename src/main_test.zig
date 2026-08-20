@@ -62,5 +62,27 @@ test "emitReportAndExit fires the health hook only on an unhealthy run" {
 
     _ = fs.deleteFile(io, sentinel) catch {};
     _ = fs.deleteFile(io, fixture) catch {};
-    _ = fs.deleteFile(io, report) catch {};
+}
+
+test "main exits non-zero on a CLI parse error, zero on --help" {
+    // Regression guard for the §30 exit-code contract (#18/#19/#21): a malformed
+    // invocation must NOT exit 0 — otherwise CI/cron gating treats a failed
+    // parse as a healthy run. The binary is assumed built (CI runs `zig build`
+    // before `zig build test`, same as evaluator.run's real-subprocess tests).
+    const a = std.heap.page_allocator;
+    var threaded = std.Io.Threaded.init(a, .{ .environ = std.Io.Threaded.global_single_threaded.environ.process_environ });
+    defer threaded.deinit();
+    const bin = "zig-out/bin/yuxi";
+
+    // Missing --task → MissingTask → exit 1.
+    const missing = try std.process.run(a, threaded.io(), .{ .argv = &[_][]const u8{ bin, "--no-hitl", "--mock" } });
+    defer a.free(missing.stdout);
+    defer a.free(missing.stderr);
+    try std.testing.expect(missing.term == .exited and missing.term.exited == 1);
+
+    // --help → HelpRequested → exit 0 (a successful info request, not an error).
+    const help = try std.process.run(a, threaded.io(), .{ .argv = &[_][]const u8{ bin, "--help" } });
+    defer a.free(help.stdout);
+    defer a.free(help.stderr);
+    try std.testing.expect(help.term == .exited and help.term.exited == 0);
 }

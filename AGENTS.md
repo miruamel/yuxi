@@ -410,7 +410,12 @@ never a bare `ctx.allocator.free(e)` that leaves a dangling pointer for a later
   machine-readable report so a CI/co-owner gate can act on the verdict without
   the engine implementing the gate (issue #2 fork still NOT built). Spawns via a
   real-allocator `Threaded` io (the global single-threaded one OOMs on spawn);
-  added `main_test` proving the hook fires/skips correctly.
+- `fix`: `main` now exits 1 on a CLI parse error (missing `--task`, unknown
+  flag) instead of `catch return` → exit 0. `--help` still exits 0. This
+  protects the §30 exit-code contract (CI/cron gate on process status from
+  #18/#19/#21): a malformed invocation must not look like a healthy run.
+  `main_test` now also shells the built binary to assert the exit codes.
+
 
 
 

@@ -54,7 +54,15 @@ All notable changes to the Yuxi engine are recorded here. Entries group the
   io (the global single-threaded io has a failing allocator and OOMs on spawn,
   same trap as `evaluator.runTo`); a hook failure is logged, never fatal. Added
   `main_test` proving the hook fires on unhealthy, is skipped on healthy
-  (without `--always-hook`), and fires on healthy with `--always-hook`.
+
+### CLI parse errors now exit non-zero (fix, §30 contract, PR #22)
+- `main` previously did `config.parse(...) catch return;` — in a `!void` main
+  that yields success, so **any** malformed invocation (e.g. missing `--task`)
+  exited 0, which contradicted the exit-code contract CI/cron gate on (#18/#19/
+  #21). Now `--help` still exits 0 (a successful info request), but a genuine
+  parse error (`MissingTask`) exits 1. `main_test` shells the built binary and
+  asserts both exit codes, so the regression is caught by `zig build test`.
+
 
 
 
