@@ -10,7 +10,15 @@ pub fn main(init: std.process.Init) !void {
     const arena = init.arena.allocator();
     const io = init.io;
     var it = std.process.Args.Iterator.init(init.minimal.args);
-    const cfg = config.parse(arena, io, &it) catch return;
+    // `parse` prints help and returns `error.HelpRequested` for `--help`
+    // (a successful info request → exit 0) or `error.MissingTask` for a
+    // genuine usage error. A real parse failure must exit non-zero so CI/cron
+    // gating (the §30 exit-code contract from #18/#19/#21) isn't fooled into
+    // treating malformed invocation as a healthy run.
+    const cfg = config.parse(arena, io, &it) catch |e| {
+        if (e != error.HelpRequested) std.process.exit(1);
+        return;
+    };
 
     if (cfg.tasks) |tasks_path| {
         var results = try loop.runTasks(arena, io, init.minimal.environ, cfg, tasks_path);
