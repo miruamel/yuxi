@@ -3,6 +3,18 @@
 All notable changes to the Yuxi engine are recorded here. Entries group the
 ## Unreleased
 
+## v0.3.0 (2026-08-20)
+
+Third tagged release. Batching the 6 merged PRs (#18–#23) since v0.2.0 —
+machine-consumable health report + exit code (#18), verdict reason in the
+report (#19), LLM API key out of argv (CWE-214, #20), external health-hook
+gating (#21), CLI parse-error exit-code contract (#22), and a build-time
+version stamp + `--version` (#23). The observability batch makes the engine's
+own autonomy-health observable to external gates, with `--version` and a
+report `version` field so a gate can correlate verdicts with the exact
+engine version. Tagged from master 134f9b2 (CI green).
+
+
 ### Machine-consumable run health report (feat, §12/§30)
 - `monitoring.writeReport` + `--report[=FILE]` emit a JSON run report (single
   `TaskResult`, or a `tasks` array + `batch_healthy` for `--tasks`). The report
