@@ -237,6 +237,12 @@ commands — do NOT "simplify" this to a `sh -c`/string-command invocation.
 the prompt path carries semi-trusted input (KB lessons, recorded evaluator
 errors, task text) that can contain raw control bytes; an unescaped one
 yields malformed JSON → server rejection → silent mock fallback.
+`monitoring.writeReport` + `--report[=FILE]` emit a machine-consumable JSON
+run report (single `TaskResult`, or `tasks[]` + `batch_healthy` for `--tasks`),
+reusing the `assessHealth` verdict. `main` exits `1` when the verdict is
+unhealthy (mock default stays exit 0). This is the engine reporting its own
+health — it does NOT implement the issue #2 deploy-gating fork; it only makes
+the verdict observable so a co-owner/CI can gate on it externally.
 
 ## Smoke test & gotchas
 End-to-end check, offline (no API key):
@@ -369,6 +375,13 @@ never a bare `ctx.allocator.free(e)` that leaves a dangling pointer for a later
   **Stakes:** gating eval behind a human breaks the autonomous loop and the §30
   runtime-feedback signal; gating only persistence keeps oversight at the
   irreversible boundary without throttling self-correction.
+- `feat`: machine-consumable run health report — `monitoring.writeReport` +
+  `--report[=FILE]` emits JSON (`TaskResult` / `tasks[]`+`batch_healthy`), and
+  `main` exits 1 on an unhealthy `assessHealth` verdict (mock default stays 0).
+  Closes the §30 runtime-feedback visibility gap without building the issue #2
+  deploy-gating fork. Also split `knowledge/knowledge_test.zig` (202 SLOC, §8)
+  into `store_test.zig` + `ledger_test.zig`, and restored dropped `--record` /
+  `--kb-max-lines=N` flag handlers.
 
 Resolved (no longer open): issue #1 (gateway rate-limit no-op) — the dead
 per-call counter was removed in `dc7f217`; gateway now does auth + validation

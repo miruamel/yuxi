@@ -5,15 +5,9 @@ const engine = @import("engine");
 const knowledge = @import("knowledge");
 const monitoring = @import("monitoring");
 
-pub const TaskResult = struct {
-    task: []const u8,
-    deploys: usize,
-    retries: usize,
-    critic_rejections: usize,
-    mock_fallbacks: usize,
-    token_budgets_exceeded: usize,
-    healthy: bool,
-};
+/// Per-task autonomy-health result. Defined in `monitoring` so a single run
+/// (main) and a batch run (runTasks) share one shape.
+pub const TaskResult = monitoring.TaskResult;
 
 /// Run each non-comment, non-blank line of `tasks_path` as an isolated
 /// engine.run cycle, then print one batch report aggregating the run metrics
