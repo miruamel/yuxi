@@ -119,7 +119,7 @@ fn printHelp(io: std.Io) void {
     types.logLine(io, "  --cache[=DIR]        opt-in on-disk LLM response cache (default .yuxi_cache)", .{});
     types.logLine(io, "  --replay[=FILE]      serve recorded responses offline", .{});
     types.logLine(io, "  --record[=FILE]      capture responses to file (default .yuxi_record.txt)", .{});
-    types.logLine(io, "Batch:", .{});
+    types.logLine(io, "  --tasks FILE         run a multi-step plan from FILE (one task per line)", .{});
     types.logLine(io, "  -V / --version       show engine version", .{});
 }
 
