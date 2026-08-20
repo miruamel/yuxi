@@ -92,6 +92,7 @@ pub fn build(b: *std.Build) void {
         "src/monitoring/monitoring_test.zig",
         "src/util/fs.zig",
         "src/main_test.zig",
+        "src/orchestrator/orchestrator_test.zig",
     };
     for (test_files) |tf| {
         const tmod = b.createModule(.{ .root_source_file = b.path(tf), .target = target, .optimize = optimize });

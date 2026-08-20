@@ -19,7 +19,7 @@ runs fully offline for development and testing.
 
 Flags: `--mock|--openai|--local`, `--hitl|--no-hitl`, `--task TEXT`,
 `--tasks FILE` (multi-step plan, one task per line), `--out DIR`,
-`--expect TEXT`, `--max-tokens N`, `--cache[=DIR]`, `--replay[=FILE]`,
+`--expect TEXT`, `--max-tokens N`, `--max-steps N` (cap autonomous plan size), `--cache[=DIR]`, `--replay[=FILE]`,
 `--record[=FILE]`, `--kb[=DIR]`, `--kb-max-lines[=N]`, `--report[=FILE]`,
 `--health-hook CMD` (spawn `CMD <report>` after an unhealthy run, or always
 with `--always-hook`), `-V/--version` (print `yuxi <tag>` + exit 0).

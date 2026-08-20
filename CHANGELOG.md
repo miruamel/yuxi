@@ -15,6 +15,19 @@
   already track it. `transport_test` now asserts the fallback (no error,
   `mock_fallbacks` +1) past a short transcript.
 
+### Plan-size bound: `--max-steps N` (feat, autonomy safety, §11/§14)
+- New `--max-steps N` caps how many steps the orchestrator may autonomously
+  decompose. If the LLM plan exceeds N, `orchestrator.run` aborts the run
+  before any codegen/build/deploy (the decomposition analogue of `--max-tokens`,
+  which bounds LLM spend). An unbounded decomposition is a real autonomy risk —
+  runaway scope and unbounded LLM/hardware cost — so this lets an operator
+  bound the engine's blast radius per task. Off by default (`max_steps == null`):
+  existing pipelines and every current test are unchanged. Plumbing:
+  `config.parse` → `Config.max_steps` → `Ctx.max_steps` (via `engine.newCtx`),
+  checked in `orchestrator.run`. Help text, README, AGENTS.md, and a parse +
+  end-to-end abort test cover it. This is an autonomy-safety bound only; it
+  does not touch the reserved deploy-gating fork tracked in issue #2.
+
 
 ## v0.3.0 (2026-08-20)
 
