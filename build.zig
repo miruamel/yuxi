@@ -29,17 +29,31 @@ pub fn build(b: *std.Build) void {
     const http = b.addModule("http", .{ .root_source_file = b.path("src/llm/http.zig"), .target = target, .optimize = optimize });
     const replay = b.addModule("replay", .{ .root_source_file = b.path("src/llm/replay.zig"), .target = target, .optimize = optimize });
     const loop = b.addModule("loop", .{ .root_source_file = b.path("src/loop.zig"), .target = target, .optimize = optimize });
+    // Build-time version stamp (§28). Detected via `git describe` so a release
+    // tag flows into the binary automatically; fall back to "" when git history
+    // is unavailable (e.g. a shallow/code-only tarball build) rather than
+    // failing the whole build. `b.run` (runAllowFail) only fatal on spawn
+    // error, not a non-zero git exit, so a missing tag/shallow clone yields "".
+    const raw_version = b.run(&[_][]const u8{ "git", "describe", "--tags", "--always", "--dirty" });
+    // git describe prints a trailing newline; trim it so the version stamp is
+    // a clean token with no embedded control char in the report/--version.
+    const version_stamp = std.mem.trim(u8, raw_version, "\r\n");
+    const version_opt = b.addOptions();
+    version_opt.addOption([]const u8, "version", version_stamp);
+    const bopt = b.createModule(.{ .root_source_file = version_opt.getOutput(), .target = target, .optimize = optimize });
+
+
     const mainmod = b.addModule("mainmod", .{ .root_source_file = b.path("src/main.zig"), .target = target, .optimize = optimize });
 
     const all = [_]*std.Build.Module{
         types,      config,    compose,    engine, step,  gateway, orchestrator, evaluator, deploy,
         resilience, knowledge, monitoring, fs,     cache, builder, critic,       transport, replay, http,
-        loop,       mainmod,
+        loop,       mainmod,   bopt,
     };
     const all_names = [_][]const u8{
         "types",      "config",    "compose",    "engine", "step",  "gateway", "orchestrator", "evaluator", "deploy",
         "resilience", "knowledge", "monitoring", "fs",     "cache", "builder", "critic",       "transport", "replay", "http",
-        "loop",     "mainmod",
+        "loop",       "mainmod",   "build_options",
     };
 
     // The dependency graph is a DAG, so wiring every module to every other

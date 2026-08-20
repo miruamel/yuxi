@@ -59,6 +59,9 @@ pub fn parse(gpa: std.mem.Allocator, io: std.Io, args: *std.process.Args.Iterato
             if (args.next()) |p| tasks = p;
         } else if (std.mem.eql(u8, arg, "--max-tokens")) {
             if (args.next()) |m| max_tokens = std.fmt.parseUnsigned(usize, m, 10) catch null;
+        } else if (std.mem.eql(u8, arg, "-V") or std.mem.eql(u8, arg, "--version")) {
+            printVersion(io);
+            return error.VersionRequested;
         } else if (std.mem.eql(u8, arg, "-h") or std.mem.eql(u8, arg, "--help")) {
             printHelp(io);
             return error.HelpRequested;
@@ -117,6 +120,14 @@ fn printHelp(io: std.Io) void {
     types.logLine(io, "  --replay[=FILE]      serve recorded responses offline", .{});
     types.logLine(io, "  --record[=FILE]      capture responses to file (default .yuxi_record.txt)", .{});
     types.logLine(io, "Batch:", .{});
-    types.logLine(io, "  --tasks FILE         run each line as an isolated cycle", .{});
-    types.logLine(io, "  -h / --help          show this help", .{});
+    types.logLine(io, "  -V / --version       show engine version", .{});
+}
+
+/// Print the build-time engine version (from `git describe`, set in
+/// build.zig as the `build_options.version` module value). Empty when the
+/// binary was built without git history; the caller's contract is just to
+/// print whatever the build stamped, so an empty line is acceptable.
+fn printVersion(io: std.Io) void {
+    const bo = @import("build_options");
+    types.logLine(io, "yuxi {s}", .{bo.version});
 }

@@ -65,9 +65,13 @@ test "monitoring.writeReport emits verdict + escapes it" {
     // Write through monitoring.writeReport (which uses the posix-backed fs
     // layer), then read back through the same layer so the read is
     // deterministic across runners and concurrent test binaries.
-    try monitoring.writeReport(allocator, io, path, single, null);
+    try monitoring.writeReport(allocator, io, path, "v0.3.0-test", single, null);
     const got = try fs.readFileAlloc(allocator, path);
     defer allocator.free(got);
+    // version travels with the report so a gate can compare engine versions
+    // across deploys: it's a top-level envelope field, present for both
+    // single and batch reports.
+    try std.testing.expect(std.mem.indexOf(u8, got, "\"version\":\"v0.3.0-test\"") != null);
     // verdict present; the JSON-breaking quote is escaped to \", the doc stays
     // valid JSON.
     try std.testing.expect(std.mem.indexOf(u8, got, "\"verdict\":\"quote\\\" inside\"") != null);
@@ -78,9 +82,10 @@ test "monitoring.writeReport emits verdict + escapes it" {
         single,
         .{ .task = "ok task", .deploys = 1, .retries = 0, .critic_rejections = 0, .mock_fallbacks = 0, .token_budgets_exceeded = 0, .healthy = true, .verdict = "" },
     };
-    try monitoring.writeReport(allocator, io, path, null, &batch);
+    try monitoring.writeReport(allocator, io, path, "v0.3.0-test", null, &batch);
     const got2 = try fs.readFileAlloc(allocator, path);
     defer allocator.free(got2);
+    try std.testing.expect(std.mem.indexOf(u8, got2, "\"version\":\"v0.3.0-test\"") != null);
     try std.testing.expect(std.mem.indexOf(u8, got2, "\"batch_healthy\":false") != null);
     try std.testing.expect(std.mem.indexOf(u8, got2, "\"tasks\":[") != null);
     try std.testing.expect(std.mem.indexOf(u8, got2, "\"verdict\":\"\"") != null);

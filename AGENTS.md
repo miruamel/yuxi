@@ -2,9 +2,13 @@
 
 Zig 0.16.0 project rooted at `src/` (root = `src/`). Implements the autonomous
 evolution engine described in `DESIGN.md`.
-Versioning is git-tag based — no `version` constant lives in `src/` or
-`build.zig`, so a release is purely a tag + `gh release` from a CI-green master.
-v0.1.0 (2026-08-19) and v0.2.0 (2026-08-20) are source tags (no binaries
+Versioning is git-tag based. `build.zig` stamps the binary at build time via
+`git describe --tags --always --dirty`, injecting it into every module as
+`build_options.version` (no hand-maintained `version` constant in `src/`);
+`--version`/`-V` prints `yuxi <tag>` and exits 0. A release is still purely a
+tag + `gh release` from a CI-green master; the tag now also flows into the
+binary and the JSON health report's `version` field.
+v0.1.0 (2026-08-19), v0.2.0 (2026-08-20), v0.3.0 are source tags (no binaries
 attached). Cut a release when a coherent batch of merged work accumulates
 (§28) — not per-PR.
 
@@ -414,7 +418,16 @@ never a bare `ctx.allocator.free(e)` that leaves a dangling pointer for a later
   flag) instead of `catch return` → exit 0. `--help` still exits 0. This
   protects the §30 exit-code contract (CI/cron gate on process status from
   #18/#19/#21): a malformed invocation must not look like a healthy run.
-  `main_test` now also shells the built binary to assert the exit codes.
+- `feat`: build-time version stamp + `--version`. `build.zig` runs `git describe
+  --tags --always --dirty` and injects it as `build_options.version` into every
+  module (no hand-maintained `version` constant, preserving the tag-based
+  convention). `--version`/`-V` prints `yuxi <tag>` and exits 0 (same success
+  contract as `--help`); `monitoring.writeReport` now emits a top-level
+  `"version"` envelope field so an external gate can compare engine versions
+  across deploys. `main_test` shells the binary to assert the `yuxi v…` stamp;
+  `config_test` proves `--version`/`VersionRequested` is reachable. CI checkout
+  now fetches full history + tags so the stamp resolves under Actions.
+
 
 
 

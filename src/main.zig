@@ -15,8 +15,10 @@ pub fn main(init: std.process.Init) !void {
     // genuine usage error. A real parse failure must exit non-zero so CI/cron
     // gating (the §30 exit-code contract from #18/#19/#21) isn't fooled into
     // treating malformed invocation as a healthy run.
+    // `parse` also returns `error.VersionRequested` for `--version`/`-V` (a
+    // successful info request → exit 0, same as `--help`).
     const cfg = config.parse(arena, io, &it) catch |e| {
-        if (e != error.HelpRequested) std.process.exit(1);
+        if (e != error.HelpRequested and e != error.VersionRequested) std.process.exit(1);
         return;
     };
 
@@ -60,6 +62,7 @@ pub fn main(init: std.process.Init) !void {
 /// implementing the gate itself (issue #2 fork is intentionally NOT built here).
 /// A hook failure is logged but never changes the process exit status.
 pub fn emitReportAndExit(alloc: std.mem.Allocator, io: std.Io, report_path: ?[]const u8, hook: ?[]const u8, always_hook: bool, single: ?monitoring.TaskResult, batch: ?[]const monitoring.TaskResult) !bool {
+    const version = comptime @import("build_options").version;
     var all_healthy = true;
     if (single) |s| all_healthy = s.healthy;
     if (batch) |b| for (b) |r| {
@@ -76,7 +79,7 @@ pub fn emitReportAndExit(alloc: std.mem.Allocator, io: std.Io, report_path: ?[]c
         report_for_hook = tmp_report;
     }
     if (report_for_hook) |p| {
-        monitoring.writeReport(alloc, io, p, single, batch) catch |e| types.logLine(io, "[main] report write failed: {s}", .{@errorName(e)});
+        monitoring.writeReport(alloc, io, p, version, single, batch) catch |e| types.logLine(io, "[main] report write failed: {s}", .{@errorName(e)});
     }
     if (hook) |cmd| {
         if (!all_healthy or always_hook) {
