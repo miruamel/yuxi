@@ -29,16 +29,17 @@ pub fn build(b: *std.Build) void {
     const http = b.addModule("http", .{ .root_source_file = b.path("src/llm/http.zig"), .target = target, .optimize = optimize });
     const replay = b.addModule("replay", .{ .root_source_file = b.path("src/llm/replay.zig"), .target = target, .optimize = optimize });
     const loop = b.addModule("loop", .{ .root_source_file = b.path("src/loop.zig"), .target = target, .optimize = optimize });
+    const mainmod = b.addModule("mainmod", .{ .root_source_file = b.path("src/main.zig"), .target = target, .optimize = optimize });
 
     const all = [_]*std.Build.Module{
         types,      config,    compose,    engine, step,  gateway, orchestrator, evaluator, deploy,
         resilience, knowledge, monitoring, fs,     cache, builder, critic,       transport, replay, http,
-        loop,
+        loop,       mainmod,
     };
     const all_names = [_][]const u8{
         "types",      "config",    "compose",    "engine", "step",  "gateway", "orchestrator", "evaluator", "deploy",
         "resilience", "knowledge", "monitoring", "fs",     "cache", "builder", "critic",       "transport", "replay", "http",
-        "loop",
+        "loop",     "mainmod",
     };
 
     // The dependency graph is a DAG, so wiring every module to every other
@@ -75,8 +76,8 @@ pub fn build(b: *std.Build) void {
         "src/llm/transport.zig",
         "src/llm/http.zig",
         "src/monitoring/monitoring_test.zig",
-        "src/util/cache.zig",
         "src/util/fs.zig",
+        "src/main_test.zig",
     };
     for (test_files) |tf| {
         const tmod = b.createModule(.{ .root_source_file = b.path(tf), .target = target, .optimize = optimize });

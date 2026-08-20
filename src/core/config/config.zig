@@ -15,6 +15,15 @@ pub const Config = struct {
     replay_path: ?[]const u8,
     record_path: ?[]const u8,
     report_path: ?[]const u8,
+    /// Optional command spawned after the run with the report path as its
+    /// first argument. Fires when the run verdict is unhealthy (or always,
+    /// with `--always-hook`). Lets an external gate (CI, a co-owner deploy
+    /// policy) consume the machine-readable verdict without the engine
+    /// implementing the gating itself. Null = disabled.
+    health_hook: ?[]const u8,
+    /// When true, the health hook fires regardless of the verdict (default:
+    /// only on an unhealthy run).
+    always_hook: bool,
 };
 
 pub fn parse(gpa: std.mem.Allocator, io: std.Io, args: *std.process.Args.Iterator) !Config {
@@ -23,6 +32,9 @@ pub fn parse(gpa: std.mem.Allocator, io: std.Io, args: *std.process.Args.Iterato
     var backend: types.LlmBackend = .mock;
     var task: ?[]const u8 = null;
     var workdir: []const u8 = "ae_out";
+    var report_path: ?[]const u8 = null;
+    var health_hook: ?[]const u8 = null;
+    var always_hook: bool = false;
     var cache_path: ?[]const u8 = null;
     var expect: ?[]const u8 = null;
     var max_tokens: ?usize = null;
@@ -31,7 +43,6 @@ pub fn parse(gpa: std.mem.Allocator, io: std.Io, args: *std.process.Args.Iterato
     var kb_max_lines: ?usize = null;
     var replay_path: ?[]const u8 = null;
     var record_path: ?[]const u8 = null;
-    var report_path: ?[]const u8 = null;
     _ = args.next(); // argv[0]
     while (args.next()) |arg| {
         if (std.mem.eql(u8, arg, "--hitl")) mode = .hitl else if (std.mem.eql(u8, arg, "--no-hitl")) mode = .no_hitl else if (std.mem.eql(u8, arg, "--mock")) backend = .mock else if (std.mem.eql(u8, arg, "--openai")) backend = .openai else if (std.mem.eql(u8, arg, "--local")) backend = .local else if (std.mem.eql(u8, arg, "--out")) {
@@ -63,12 +74,16 @@ pub fn parse(gpa: std.mem.Allocator, io: std.Io, args: *std.process.Args.Iterato
             kb_max_lines = 200;
         } else if (std.mem.startsWith(u8, arg, "--kb-max-lines=")) {
             kb_max_lines = std.fmt.parseUnsigned(usize, arg["--kb-max-lines=".len..], 10) catch 200;
+        } else if (std.mem.eql(u8, arg, "--health-hook")) {
+            if (args.next()) |c| health_hook = c;
+        } else if (std.mem.eql(u8, arg, "--always-hook")) {
+            always_hook = true;
+        } else if (std.mem.eql(u8, arg, "--report")) {
+            report_path = ".yuxi_report.json";
         } else if (std.mem.eql(u8, arg, "--record")) {
             record_path = ".yuxi_record.txt";
         } else if (std.mem.startsWith(u8, arg, "--record=")) {
             record_path = arg["--record=".len..];
-        } else if (std.mem.eql(u8, arg, "--report")) {
-            report_path = ".yuxi_report.json";
         } else if (std.mem.startsWith(u8, arg, "--report=")) {
             report_path = arg["--report=".len..];
         } else if (task == null) task = arg;
@@ -78,7 +93,7 @@ pub fn parse(gpa: std.mem.Allocator, io: std.Io, args: *std.process.Args.Iterato
         printHelp(io);
         return error.MissingTask;
     };
-    return .{ .mode = mode, .backend = backend, .task = t, .workdir = workdir, .cache_path = cache_path, .expect = expect, .max_tokens = max_tokens, .tasks = tasks, .kb_path = kb_path, .kb_max_lines = kb_max_lines, .replay_path = replay_path, .record_path = record_path, .report_path = report_path };
+    return .{ .mode = mode, .backend = backend, .task = t, .workdir = workdir, .cache_path = cache_path, .expect = expect, .max_tokens = max_tokens, .tasks = tasks, .kb_path = kb_path, .kb_max_lines = kb_max_lines, .replay_path = replay_path, .record_path = record_path, .report_path = report_path, .health_hook = health_hook, .always_hook = always_hook };
 }
 fn printHelp(io: std.Io) void {
     types.logLine(io, "Yuxi (玉溪): autonomous software evolution engine", .{});
@@ -86,7 +101,8 @@ fn printHelp(io: std.Io) void {
     types.logLine(io, "", .{});
     types.logLine(io, "Mode:", .{});
     types.logLine(io, "  --hitl / --no-hitl   human-approval vs autonomous (default --no-hitl)", .{});
-    types.logLine(io, "Backend:", .{});
+    types.logLine(io, "  --report[=FILE]     write machine-consumable JSON health report", .{});
+    types.logLine(io, "  --health-hook CMD   run CMD <report> after an unhealthy run (or always with --always-hook)", .{});
     types.logLine(io, "  --mock / --openai / --local   LLM backend (default --mock)", .{});
     types.logLine(io, "Task:", .{});
     types.logLine(io, "  --task TEXT          task prompt (may also be a trailing arg)", .{});
