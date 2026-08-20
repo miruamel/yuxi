@@ -39,6 +39,9 @@ evolution engine described in `DESIGN.md`.
 - `core/{types,config,engine,compose}.zig` — `Ctx` state, CLI parse, the 9-layer loop, fragment composition.
 - `llm/transport.zig` — single LLM entry `complete(...)`. Backends: mock (offline),
   openai (`OPENAI_BASE`/`OPENAI_API_KEY`), local (ollama `LOCAL_BASE`).
+  `llm/http.zig` — network path: `http.complete` shells `curl` with bounded
+  retries (3 attempts, 250ms·n backoff) + `-m 60 --connect-timeout 10` so a
+  transient failure doesn't abort the build or silently fall back to mock.
 - `gateway orchestrator builder critic evaluator deploy resilience knowledge monitoring`
   — one module per layer.
 - `util/{fs,cache}.zig` — posix file IO; on-disk LLM-response cache.
@@ -60,7 +63,15 @@ dispatch — including curl auth, response handling, and the full engine loop �
 offline, with no API key, for CI and integration tests. `transport_test.zig`
 covers ordered playback (unit) and a full `engine.run` deploy through the
 real openai path via replay.
-- **Record/replay loop (feat):** `--record` writes a transcript that `--replay`
+- **Network retry (feat):** `http.complete` (llm/http.zig) now retries the curl
+  call up to 3 times with linear backoff (250ms·attempt) and passes `-m 60
+  --connect-timeout 10` to curl, so a transient 5xx/connection-reset/timeout no
+  longer aborts the build and triggers a silent mock fallback. Persistent
+  failure still propagates `error.RequestFailed` for `resilience.fallback` to
+  handle. `transport.zig` delegates the network path to `http.complete`; the
+  mock/replay/cache paths are untouched. `http.zig` carries the JSON-escape and
+  content-extraction unit tests moved out of `transport.zig` (which shrank to a
+  dispatch stub).
   consumes verbatim, so a single real (or mock) run can be replayed through the
   real `.openai`/`.local` dispatch offline with no API key. `transport_test.zig`
   proves the round-trip end-to-end (mock capture -> offline replay deploy).
@@ -287,9 +298,10 @@ owns those). In a unit test use `std.heap.page_allocator` (not
 and free `eval_error` via `ctx.clearEvalError()` (which nulls the field),
 never a bare `ctx.allocator.free(e)` that leaves a dangling pointer for a later
 `clearEvalError` to double-free.
-- Real LLM backends (`.openai`/`.local`) shell `curl` (`transport.httpComplete`); `curl`
-  must be on PATH at runtime. `extractContent` unescapes JSON `\n`/`\t` so multi-line
-  generated code survives the OpenAI response — a regression test now guards this.
+- Real LLM backends (`.openai`/`.local`) shell `curl` via `http.complete`
+  (llm/http.zig), which retries up to 3 times with backoff and a 60s/10s curl
+  timeout. `extractContent` unescapes JSON `\n`/`\t` so multi-line generated
+  code survives the OpenAI response — a regression test now guards this.
 - `.gitignore` covers binaries, build dirs, `gen_*.zig`, `.yuxi_cache`, `/ae_out/`.
 
 ## Recent cycles (category balance, §14)
