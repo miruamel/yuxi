@@ -99,6 +99,37 @@ test "knowledge recordLesson appends the eval error on a failed run" {
     try std.testing.expect(std.mem.indexOf(u8, got, "cannot find 'foo'") != null);
 }
 
+test "knowledge recordHealth persists the verdict on an unhealthy cycle" {
+    const alloc = std.testing.allocator;
+    const io = std.Io.Threaded.global_single_threaded.io();
+    const base = "/tmp/yuxi_kb_health_test";
+    const path = try std.fmt.allocPrint(alloc, "{s}/kb.md", .{base});
+    defer alloc.free(path);
+    defer std.Io.Dir.deleteTree(std.Io.Dir.cwd(), io, base) catch {};
+    var ctx = try types.Ctx.init(alloc, io, .empty, .no_hitl, .mock, null, "", base);
+    ctx.kb_path = path;
+    ctx.deploys = 0;
+    ctx.retries = 1;
+    try knowledge.recordHealth(&ctx, "no deploy; self-correction exhausted; ");
+    const got = (try knowledge.load(alloc, path)).?;
+    defer alloc.free(got);
+    try std.testing.expect(std.mem.indexOf(u8, got, "- health: no deploy; self-correction exhausted; ") != null);
+}
+
+test "knowledge recordHealth is a no-op on a healthy cycle" {
+    const alloc = std.testing.allocator;
+    const io = std.Io.Threaded.global_single_threaded.io();
+    const base = "/tmp/yuxi_kb_health_ok_test";
+    const path = try std.fmt.allocPrint(alloc, "{s}/kb.md", .{base});
+    defer alloc.free(path);
+    defer std.Io.Dir.deleteTree(std.Io.Dir.cwd(), io, base) catch {};
+    var ctx = try types.Ctx.init(alloc, io, .empty, .no_hitl, .mock, null, "", base);
+    ctx.kb_path = path;
+    try knowledge.recordHealth(&ctx, "");
+    const got = try knowledge.load(alloc, path);
+    try std.testing.expect(got == null);
+}
+
 test "knowledge recordCritic writes a qualitative lesson" {
     const alloc = std.testing.allocator;
     const io = std.Io.Threaded.global_single_threaded.io();
