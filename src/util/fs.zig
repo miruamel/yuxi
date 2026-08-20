@@ -17,6 +17,26 @@ pub fn writeFileAlloc(allocator: std.mem.Allocator, path: []const u8, content: [
     }
 }
 
+/// Write `content` to `path` with `0600` permissions — for files that contain
+/// secrets (e.g. an LLM API key handed to a child process). Unlike
+/// `writeFileAlloc` (0644), the content is not group/world readable.
+pub fn writeFileSecret(allocator: std.mem.Allocator, path: []const u8, content: []const u8) !void {
+    _ = allocator;
+    const fd = try std.posix.openat(
+        std.posix.AT.FDCWD,
+        path,
+        std.posix.O{ .ACCMODE = .WRONLY, .CREAT = true, .TRUNC = true, .CLOEXEC = true, .EXCL = true },
+        0o600,
+    );
+    defer _ = std.os.linux.close(fd);
+    var off: usize = 0;
+    while (off < content.len) {
+        const n = std.os.linux.write(fd, content[off..].ptr, content.len - off);
+        if (n == 0) break;
+        off += n;
+    }
+}
+
 pub fn readFileAlloc(allocator: std.mem.Allocator, path: []const u8) ![]u8 {
     const fd = try std.posix.openat(
         std.posix.AT.FDCWD,
