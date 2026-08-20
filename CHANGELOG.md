@@ -2,6 +2,49 @@
 
 All notable changes to the Yuxi engine are recorded here. Entries group the
 tracked history by capability; commit hashes reference `git log`.
+## v0.2.0 (2026-08-20)
+
+Second tagged release. Batching the 8 merged PRs (#8–#16) since v0.1.0 —
+plan-quality gating, hardened + observable network LLM path, safer knowledge
+injection, honest health verdicts, a security fix, and a CLI-help/docs
+correction. No breaking changes; the v0.1.0 pipeline + flags remain forward
+compatible. Tagged from master 35e48e3 (CI green).
+
+### Highlights
+- Plan critic gate (PR #8). engine.run reviews the orchestrator's decomposition
+  before codegen; a REJECT aborts with a recorded lesson instead of shipping
+  weak code. Always-on, fail-fast, non-breaking.
+- Hardened network LLM path (PR #13 + #14). transport.complete delegates to
+  llm/http.zig, which retries curl up to 3x (bounded, no sleep) with
+  -m 60 --connect-timeout 10, so a transient failure no longer silently
+  degrades to the mock backend. Recovered retries surface as Ctx.network_retries
+  (observability only — does not trip the health verdict).
+- Correct, safe JSON (PR #15). http.jsonEscape now escapes the full RFC 8259
+  control range (U+0000-U+001F), closing a silent mock-fallback triggered by
+  raw control bytes in semi-trusted input (KB lessons, evaluator errors).
+- Bounded KB injection (PR #12). --kb-max-lines[=N] caps the lessons appended to
+  each prompt (bare = 200, default off). Unbounded prompts no longer bloat on a
+  long-lived KB.
+- Honest health + closed learning loop. monitoring.assessHealth is the single
+  source of truth for cycle health (PR #11); the --tasks batch summary and the
+  KB can no longer disagree. Plan-reject no longer truncates the learning loop
+  (PR #9), and builder-level mock fallbacks are now counted (PR #10).
+- Security fix (PR #7). the PII redactor now removes the whole @-token
+  (e.g. user@corp.com -> <redacted>), closing an email-domain leak.
+- CLI help + docs correctness (PR #16). yuxi --help was stale — it omitted
+  --cache, --replay, --record, --kb, --kb-max-lines, --expect, and --tasks.
+  The help surface is now authoritative, with a test locking it against
+  regression.
+
+### Engineering
+- CI green on push/PR: zig build, zig build test, zig fmt --check src.
+- Config parsing moved into core/config/ (its own subtree) and gained
+  config_test.zig; core/ stays within the five-file ceiling (Section 8).
+- No binary artifacts are attached; this is a source tag, consistent with v0.1.0.
+
+### Carried forward (open co-owner forks)
+- #2 --dry-run/plan-mode and --hitl deploy gating — not addressed this release.
+
 ### Maintenance & Docs
 - `docs`: `yuxi --help` was stale — it omitted `--cache`, `--replay`,
   `--record`, `--kb`, `--kb-max-lines`, `--expect`, and `--tasks`, all of which
