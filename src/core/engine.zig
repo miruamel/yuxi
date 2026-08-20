@@ -5,6 +5,7 @@ const compose = @import("compose");
 const gateway = @import("gateway");
 const orchestrator = @import("orchestrator");
 const evaluator = @import("evaluator");
+const critic = @import("critic");
 const deploy = @import("deploy");
 const resilience = @import("resilience");
 const knowledge = @import("knowledge");
@@ -33,7 +34,26 @@ pub fn run(allocator: std.mem.Allocator, io: std.Io, ctx: *types.Ctx, task: []co
         ctx.log("[engine] ABORT at orchestrator", .{});
         return;
     }
-    // LAYER 3-6: per step (Builder -> Critic), then compose + Evaluator -> Deploy.
+    // LAYER 2.5: Plan-quality gate. Review the decomposition before committing
+    // to codegen; a bad plan fails fast instead of burning the self-correction
+    // budget. Mirrors the per-step critic gate in step.zig.
+    {
+        var buf = try std.ArrayList(u8).initCapacity(allocator, 0);
+        for (steps.items) |s| {
+            try buf.appendSlice(allocator, "STEP: ");
+            try buf.appendSlice(allocator, s.name);
+            try buf.append(allocator, '\n');
+        }
+        const pv = try critic.reviewPlan(ctx, try buf.toOwnedSlice(allocator));
+        if (!pv.ok) {
+            ctx.critic_rejections += 1;
+            knowledge.recordCritic(ctx, "plan", pv.reason orelse "no reason") catch |e| ctx.log("[knowledge] plan lesson failed: {s}", .{@errorName(e)});
+            if (pv.reason) |r| allocator.free(r);
+            ctx.log("[engine] ABORT at plan critic", .{});
+            return;
+        }
+        if (pv.reason) |r| allocator.free(r);
+    }
     // On evaluation failure the compiler/run error is fed back to the builder
     // and the pipeline is rebuilt up to `max_attempts` times (self-correction).
     var fragments = try std.ArrayList([]const u8).initCapacity(allocator, 0);

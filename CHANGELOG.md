@@ -2,7 +2,16 @@
 
 All notable changes to the Yuxi engine are recorded here. Entries group the
 tracked history by capability; commit hashes reference `git log`.
-## Unreleased
+### Features
+- `feat`: plan-quality critic gate. `engine.run` now reviews the orchestrator's
+  decomposition *before* codegen (LAYER 2.5). `critic.reviewPlan` reuses the
+  critic transport + verdict parser with a plan-specific prompt; on REJECT it
+  increments `critic_rejections`, persists a `knowledge.recordCritic("plan", …)`
+  lesson, logs `engine: ABORT at plan critic`, and returns before any codegen
+  or deploy. Always-on, fail-fast, non-breaking — the default backend returns
+  APPROVE. New `src/core/selfcorr/plan_gate_test.zig` exercises the reject
+  path end-to-end via the `Ctx.llm_fn` seam. Resolves §14 feature-bias drift
+  after five consecutive non-feature cycles.
 
 ### Engineering / observability
 - `refactor`: removed dead code in `src/gateway/gateway.zig` — the no-op

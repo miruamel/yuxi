@@ -87,7 +87,23 @@ workdir repo is created.
   `user<redacted>corp.com` — the domain stayed visible. `redact` now replaces
   the WHOLE whitespace token containing `@` (`user@corp.com` -> `<redacted>`),
   preferring over-redaction at the trust boundary. `gateway_test.zig` covers
-  admission, whole-email redaction, and the no-PII passthrough.
+- **Plan-quality gate (feat):** `engine.run` now reviews the orchestrator's
+  decomposition *before* codegen (LAYER 2.5, between orchestrator and the
+  per-step build/critic loop). `critic.reviewPlan` reuses the critic transport
+  + `parseVerdict` with a plan-specific prompt; on REJECT it increments
+  `ctx.critic_rejections`, persists a `knowledge.recordCritic("plan", …)`
+  lesson, logs `engine: ABORT at plan critic`, and returns before any codegen
+  or deploy. Always-on, fail-fast, non-breaking — the mock/test backend
+  returns APPROVE by default. `plan_gate_test.zig` exercises the reject path
+  end-to-end via the `Ctx.llm_fn` seam.
+- **Test seam convention (don't regress):** the plan reviewer is *distinct*
+  from the per-step code critic. The plan reviewer's system prompt deliberately
+  omits the word "critic" and sends a `"Plan:\n…"` user-prompt prefix; the
+  per-step code critic uses a `"critic"` system string and a `"Review:\n…"`
+  user prefix. Injected-backend tests that distinguish the two must key on
+  those prefixes, not on a shared "critic" substring — otherwise the plan call
+  is misrouted and desyncs the replay/test transcript.
+
 
 ## AI review bot (co-owner signal)
 `Kilo Code Review` runs as a required-ish check on every PR (shows as a
@@ -274,7 +290,7 @@ never a bare `ctx.allocator.free(e)` that leaves a dangling pointer for a later
 - `19c1bde` fix(gateway): sanitizer was a silent no-op — `gateway.run` redacted the task then discarded it, so orchestrator + KB ran on raw text. Now returns the owned redacted slice; `engine.run` uses it downstream. New `gateway_test.zig`. Kilo Code Review: No Issues Found | Merge. PR #6.
 - `HEAD` fix(security): redactor leaked email domains — `redact` only replaced `@` so `user@corp.com` became `user<redacted>corp.com`. Now redacts the whole @-token (`user@corp.com` -> `<redacted>`); over-redaction at trust boundary. Gateway tests cover admission + whole-email + no-PII passthrough.
 
-## Open questions (for the co-owner, not silently built)
+- `HEAD` feat(core): plan-quality critic gate — review decomposition before codegen (LAYER 2.5); fail-fast on REJECT, persist plan lesson. New plan_gate_test.zig. Resolves §14 feature-bias drift (5 non-feature cycles).
 - `--dry-run` / plan mode (Product-shaping fork; needs co-owner call): what
   should it surface — the decomposed `STEP:` plan only, the critic verdict on
   the first generated artifact, or the full eval result? **My lean: plan +
