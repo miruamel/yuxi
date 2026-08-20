@@ -444,6 +444,14 @@ never a bare `ctx.allocator.free(e)` that leaves a dangling pointer for a later
   framed Options A (dry-run/plan mode), B (--hitl deploy gate), C (external
   policy hook) and deferred to the co-owner. The report + health-hook plumbing
   it would consume is already merged (v0.3.0).
+- `feat`: cap autonomous plan size with `--max-steps` (PR #26, merged at
+  `e54b0b0`). `config.parse` → `Config.max_steps` → `Ctx.max_steps`
+  (wired in `engine.newCtx`) → guard in `orchestrator.run`: if the LLM plan
+  exceeds N, the run aborts before codegen/build/deploy (decomposition
+  analogue of `--max-tokens`). Autonomy-safety bound; off by default. Does
+  NOT touch the reserved issue #2 deploy-gating fork. New `orchestrator_test`
+  + `config_test` coverage; CLI smoke confirmed abort (no deploy, exit 1) vs
+  normal deploy with a generous cap.
 
 
 
