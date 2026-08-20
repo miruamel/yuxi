@@ -20,6 +20,7 @@ pub fn build(b: *std.Build) void {
     const deploy = b.addModule("deploy", .{ .root_source_file = b.path("src/deploy/deploy.zig"), .target = target, .optimize = optimize });
     const resilience = b.addModule("resilience", .{ .root_source_file = b.path("src/resilience/resilience.zig"), .target = target, .optimize = optimize });
     const knowledge = b.addModule("knowledge", .{ .root_source_file = b.path("src/knowledge/knowledge.zig"), .target = target, .optimize = optimize });
+    const store = b.addModule("store", .{ .root_source_file = b.path("src/knowledge/store.zig"), .target = target, .optimize = optimize });
     const monitoring = b.addModule("monitoring", .{ .root_source_file = b.path("src/monitoring/monitoring.zig"), .target = target, .optimize = optimize });
     const fs = b.addModule("fs", .{ .root_source_file = b.path("src/util/fs.zig"), .target = target, .optimize = optimize });
     const cache = b.addModule("cache", .{ .root_source_file = b.path("src/util/cache.zig"), .target = target, .optimize = optimize });
@@ -47,12 +48,12 @@ pub fn build(b: *std.Build) void {
 
     const all = [_]*std.Build.Module{
         types,      config,    compose,    engine, step,  gateway, orchestrator, evaluator, deploy,
-        resilience, knowledge, monitoring, fs,     cache, builder, critic,       transport, replay, http,
+        resilience, knowledge, store,      monitoring, fs,     cache, builder, critic,       transport, replay, http,
         loop,       mainmod,   bopt,
     };
     const all_names = [_][]const u8{
         "types",      "config",    "compose",    "engine", "step",  "gateway", "orchestrator", "evaluator", "deploy",
-        "resilience", "knowledge", "monitoring", "fs",     "cache", "builder", "critic",       "transport", "replay", "http",
+        "resilience", "knowledge", "store",      "monitoring", "fs",     "cache", "builder", "critic",       "transport", "replay", "http",
         "loop",       "mainmod",   "build_options",
     };
 

@@ -93,6 +93,59 @@ test "knowledge recordCritic writes a qualitative lesson" {
     try std.testing.expect(std.mem.indexOf(u8, got, "- critic rejected \"add error handling\": missing error handling") != null);
 }
 
+test "knowledge save bounds the on-disk ledger to kb_max_lines" {
+    // Regression: a continuously running autonomous engine must not grow the
+    // ledger without limit. save() must enforce the bound on write, not only
+    // tailLessons() at inject time — otherwise the file grows forever while
+    // only the tail is ever read.
+    const alloc = std.testing.allocator;
+    const io = std.Io.Threaded.global_single_threaded.io();
+    const base = "/tmp/yuxi_kb_bounded_save_test";
+    const path = try std.fmt.allocPrint(alloc, "{s}/kb.md", .{base});
+    defer alloc.free(path);
+    defer std.Io.Dir.deleteTree(std.Io.Dir.cwd(), io, base) catch {};
+    // 5 lessons, bounded to 2 on disk.
+    try knowledge.save(alloc, path, "lesson 1", 2);
+    try knowledge.save(alloc, path, "lesson 2", 2);
+    try knowledge.save(alloc, path, "lesson 3", 2);
+    try knowledge.save(alloc, path, "lesson 4", 2);
+    try knowledge.save(alloc, path, "lesson 5", 2);
+    const got = (try knowledge.load(alloc, path)).?;
+    defer alloc.free(got);
+    // Oldest lessons are trimmed from disk; only the last two survive.
+    try std.testing.expect(std.mem.indexOf(u8, got, "lesson 1") == null);
+    try std.testing.expect(std.mem.indexOf(u8, got, "lesson 2") == null);
+    try std.testing.expect(std.mem.indexOf(u8, got, "lesson 4") != null);
+    try std.testing.expect(std.mem.indexOf(u8, got, "lesson 5") != null);
+    // Exactly two lines remain on disk.
+    var lines: usize = 0;
+    for (got) |c| {
+        if (c == '\n') lines += 1;
+    }
+    try std.testing.expectEqual(@as(usize, 2), lines);
+}
+
+test "knowledge save is unbounded when kb_max_lines is null" {
+    const alloc = std.testing.allocator;
+    const io = std.Io.Threaded.global_single_threaded.io();
+    const base = "/tmp/yuxi_kb_unbounded_save_test";
+    const path = try std.fmt.allocPrint(alloc, "{s}/kb.md", .{base});
+    defer alloc.free(path);
+    defer std.Io.Dir.deleteTree(std.Io.Dir.cwd(), io, base) catch {};
+    try knowledge.save(alloc, path, "lesson A", null);
+    try knowledge.save(alloc, path, "lesson B", null);
+    try knowledge.save(alloc, path, "lesson C", null);
+    const got = (try knowledge.load(alloc, path)).?;
+    defer alloc.free(got);
+    try std.testing.expect(std.mem.indexOf(u8, got, "lesson A") != null);
+    try std.testing.expect(std.mem.indexOf(u8, got, "lesson C") != null);
+    var lines: usize = 0;
+    for (got) |c| {
+        if (c == '\n') lines += 1;
+    }
+    try std.testing.expectEqual(@as(usize, 3), lines);
+}
+
 test "knowledge recordBatch persists the batch summary to the KB" {
     const alloc = std.testing.allocator;
     const io = std.Io.Threaded.global_single_threaded.io();
