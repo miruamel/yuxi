@@ -1,15 +1,32 @@
 const std = @import("std");
 const types = @import("types");
+const fs = @import("fs");
+
+var curl_cfg_seq: usize = 0;
+
+/// Build a curl `-K` config file containing the `Authorization` header so the
+/// LLM key is never passed as an argv element (world-readable via `ps`/process
+/// listing → CWE-214). The file is `0600` and deleted after the request.
+fn writeAuthConfig(allocator: std.mem.Allocator, key: []const u8) ![]u8 {
+    const path = try std.fmt.allocPrint(allocator, "/tmp/.yuxi_curl_{}.cfg", .{curl_cfg_seq});
+    curl_cfg_seq += 1;
+    const header = try std.fmt.allocPrint(allocator, "header = \"Authorization: Bearer {s}\"", .{key});
+    defer allocator.free(header);
+    try fs.writeFileSecret(allocator, path, header);
+    return path;
+}
 
 /// One network attempt against the LLM HTTP endpoint. Returns the extracted
 /// `content` field, or `error.RequestFailed` when curl reports no body (a
 /// connection failure, DNS error, timeout, or HTTP error with `-f`). The caller
 /// is responsible for retrying; this never retries on its own.
-fn curlOnce(allocator: std.mem.Allocator, io: std.Io, url: []const u8, auth: []const u8, body: []const u8) ![]u8 {
+fn curlOnce(allocator: std.mem.Allocator, io: std.Io, url: []const u8, auth_config_path: []const u8, body: []const u8) ![]u8 {
     // `-f` makes curl exit non-zero on HTTP errors (4xx/5xx) and print nothing
     // to stdout; `-m` / `--connect-timeout` bound total and connect wait so a
     // hung or unreachable endpoint can't stall the engine indefinitely.
-    const argv = [_][]const u8{ "curl", "-s", "-N", "-f", "-m", "60", "--connect-timeout", "10", "-X", "POST", url, "-H", "Content-Type: application/json", "-H", auth, "-d", body };
+    // `-K <file>` reads the Authorization header from the 0600 config file so
+    // the API key never appears in the process table.
+    const argv = [_][]const u8{ "curl", "-s", "-N", "-f", "-m", "60", "--connect-timeout", "10", "-X", "POST", url, "-K", auth_config_path, "-H", "Content-Type: application/json", "-d", body };
     const res = try std.process.run(allocator, io, .{ .argv = &argv });
     defer allocator.free(res.stdout);
     defer allocator.free(res.stderr);
@@ -28,11 +45,12 @@ pub fn complete(allocator: std.mem.Allocator, io: std.Io, ctx: *types.Ctx, syste
     const url = try std.fmt.allocPrint(allocator, "{s}/chat/completions", .{ctx.llm_base});
     defer allocator.free(url);
     const key = ctx.llm_key orelse "";
-    const auth = try std.fmt.allocPrint(allocator, "Authorization: Bearer {s}", .{key});
-    defer allocator.free(auth);
+    const auth_config_path = try writeAuthConfig(allocator, key);
+    defer allocator.free(auth_config_path);
+    defer fs.deleteFile(io, auth_config_path) catch {};
     const model = if (ctx.backend == .openai) "gpt-4o-mini" else "local";
     const sys_esc = try jsonEscape(allocator, system);
-
+    defer allocator.free(sys_esc);
     const user_esc = try jsonEscape(allocator, user);
     defer allocator.free(user_esc);
     const body = try std.fmt.allocPrint(allocator,
@@ -48,7 +66,7 @@ pub fn complete(allocator: std.mem.Allocator, io: std.Io, ctx: *types.Ctx, syste
     // mock_fallbacks or trip the health check.
     var recovered = false;
     while (attempt < max_attempts) : (attempt += 1) {
-        const got = curlOnce(allocator, io, url, auth, body) catch |e| {
+        const got = curlOnce(allocator, io, url, auth_config_path, body) catch |e| {
             ctx.log("[transport] http attempt {d}/{d} failed: {s}", .{ attempt + 1, max_attempts, @errorName(e) });
             if (attempt + 1 < max_attempts) {
                 recovered = true;
@@ -164,4 +182,15 @@ test "jsonEscape escapes full control-char range per RFC 8259" {
     const got = try jsonEscape(a, "x\x1by\x0bz");
     defer a.free(got);
     try std.testing.expectEqualStrings("x\\u001By\\u000Bz", got);
+}
+
+test "writeAuthConfig writes a 0600 file with the bearer header, never in argv" {
+    const a = std.testing.allocator;
+    const io = std.Io.Threaded.global_single_threaded.io();
+    const path = try writeAuthConfig(a, "sk-secret-token");
+    defer a.free(path);
+    defer fs.deleteFile(io, path) catch {};
+    const got = try fs.readFileAlloc(a, path);
+    defer a.free(got);
+    try std.testing.expectEqualStrings("header = \"Authorization: Bearer sk-secret-token\"", got);
 }
