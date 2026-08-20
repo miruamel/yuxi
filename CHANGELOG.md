@@ -33,7 +33,29 @@ All notable changes to the Yuxi engine are recorded here. Entries group the
 - New unit test covers the report shape for both single and batch, including a
   verdict containing a JSON-breaking quote (escaped correctly → valid JSON).
 - Also fixed a latent per-element leak in the `--tasks` path: `main` now frees
-  each result's `task` + `verdict` dups before tearing down `results`.
+
+### Keep LLM API key out of the process table (fix, CWE-214, PR #20)
+- `llm/http.zig` passed the `Authorization: Bearer <key>` header as a curl
+  `-H` argv element, making the LLM secret world-readable via `ps` / process
+  listing on any shared host or CI runner. It now writes the bearer header to a
+  `0600` temp config file and hands it to curl via `-K`, so the key never
+  enters argv. `fs.writeFileSecret` adds the `0600` open mode; the temp file is
+  deleted after the request. Added a regression test asserting the header lands
+  in the file (proving it left argv) and the file is cleaned up.
+
+### External health gating via `--health-hook` (feat, §12 follow-on, PR #21)
+- New `--health-hook <CMD>`: after the run, `<CMD> <report>` is spawned when the
+  verdict is unhealthy (or always with `--always-hook`). It consumes the
+  machine-readable `--report` JSON so a CI job or co-owner deploy policy can act
+  on the verdict without the engine implementing the gate itself — the issue #2
+  deploy-gating fork is intentionally NOT built here. If a hook is set but no
+  `--report` was requested, a temp `0600`-free report is written so the hook
+  still receives input. The hook is spawned through a real-allocator `Threaded`
+  io (the global single-threaded io has a failing allocator and OOMs on spawn,
+  same trap as `evaluator.runTo`); a hook failure is logged, never fatal. Added
+  `main_test` proving the hook fires on unhealthy, is skipped on healthy
+  (without `--always-hook`), and fires on healthy with `--always-hook`.
+
 
 
 ## v0.2.0 (2026-08-20)

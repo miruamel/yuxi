@@ -39,6 +39,13 @@ lives in `core/config/config.zig: printHelp`).
 - `--tasks FILE` — batch mode: run each non-comment, non-blank line as an
   isolated engine cycle and aggregate the autonomy-health report (see
   `loop.zig`).
+- `--report[=FILE]` — write the machine-consumable JSON health report (see the
+  run-report note below). `--health-hook <CMD>` runs `<CMD> <report>` after an
+  unhealthy run (or always with `--always-hook`), so an external gate (CI, a
+  co-owner deploy policy) can consume the verdict without the engine
+  implementing the gate. The hook is spawned with a real-allocator `Threaded`
+  io (the global single-threaded io's allocator is `.failing` and OOMs on
+  spawn — same trap as `evaluator.runTo`); a hook failure is logged, never fatal.
 
 ## Verify
 ```bash
@@ -395,7 +402,16 @@ never a bare `ctx.allocator.free(e)` that leaves a dangling pointer for a later
   `writeReport` emits `"verdict":"…"` so a gate branches on *why* a run is
   unhealthy, not just the boolean. `monitoring.taskResult` centralizes the
   borrow→own dup; added a `writeReport` shape test (incl. JSON-breaking quote
-  escaping) and fixed a latent per-element leak in the `--tasks` path.
+- `fix`: keep the LLM API key out of the process table (CWE-214) — `http.complete`
+  now writes the bearer header to a `0600` temp config and passes it to curl
+  via `-K` instead of an `-H` argv element; added a regression test.
+- `feat`: external health gating via `--health-hook <CMD>` (fires `<CMD>
+  <report>` on an unhealthy run, or always with `--always-hook`). Consumes the
+  machine-readable report so a CI/co-owner gate can act on the verdict without
+  the engine implementing the gate (issue #2 fork still NOT built). Spawns via a
+  real-allocator `Threaded` io (the global single-threaded one OOMs on spawn);
+  added `main_test` proving the hook fires/skips correctly.
+
 
 
 Resolved (no longer open): issue #1 (gateway rate-limit no-op) — the dead
