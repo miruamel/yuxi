@@ -452,6 +452,17 @@ never a bare `ctx.allocator.free(e)` that leaves a dangling pointer for a later
   NOT touch the reserved issue #2 deploy-gating fork. New `orchestrator_test`
   + `config_test` coverage; CLI smoke confirmed abort (no deploy, exit 1) vs
   normal deploy with a generous cap.
+- `fix`: `--max-steps` abort was misread as a generic unhealthy cycle (it
+  emitted only the `no deploy; ` verdict), polluting the next cycle's KB
+  steering (PR #27, `8c23a2b`). Mirrored the `token_budgets_exceeded`
+  pattern: added `Ctx.max_steps_exceeded`, incremented it on the
+  orchestrator abort, and gave `assessHealth` a distinct `max-steps
+  exceeded; ` verdict clause + WARN line. `orchestrator_test` now asserts
+  the counter; CLI smoke confirms the distinct WARN + exit 1.
+- `note`: carry-over items from prior cycle summaries are already landed on
+  master — `ci.yml` already sets `fetch-depth: 0` + `fetch-tags: true`
+  (verifies `--version` via `git describe` works in CI), and the replay
+  mock-fallback fix shipped in PR #25. Don't re-attempt either.
 
 
 
