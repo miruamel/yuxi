@@ -14,6 +14,7 @@ pub const Config = struct {
     kb_max_lines: ?usize,
     replay_path: ?[]const u8,
     record_path: ?[]const u8,
+    report_path: ?[]const u8,
 };
 
 pub fn parse(gpa: std.mem.Allocator, io: std.Io, args: *std.process.Args.Iterator) !Config {
@@ -30,6 +31,7 @@ pub fn parse(gpa: std.mem.Allocator, io: std.Io, args: *std.process.Args.Iterato
     var kb_max_lines: ?usize = null;
     var replay_path: ?[]const u8 = null;
     var record_path: ?[]const u8 = null;
+    var report_path: ?[]const u8 = null;
     _ = args.next(); // argv[0]
     while (args.next()) |arg| {
         if (std.mem.eql(u8, arg, "--hitl")) mode = .hitl else if (std.mem.eql(u8, arg, "--no-hitl")) mode = .no_hitl else if (std.mem.eql(u8, arg, "--mock")) backend = .mock else if (std.mem.eql(u8, arg, "--openai")) backend = .openai else if (std.mem.eql(u8, arg, "--local")) backend = .local else if (std.mem.eql(u8, arg, "--out")) {
@@ -65,6 +67,10 @@ pub fn parse(gpa: std.mem.Allocator, io: std.Io, args: *std.process.Args.Iterato
             record_path = ".yuxi_record.txt";
         } else if (std.mem.startsWith(u8, arg, "--record=")) {
             record_path = arg["--record=".len..];
+        } else if (std.mem.eql(u8, arg, "--report")) {
+            report_path = ".yuxi_report.json";
+        } else if (std.mem.startsWith(u8, arg, "--report=")) {
+            report_path = arg["--report=".len..];
         } else if (task == null) task = arg;
     }
 
@@ -72,7 +78,7 @@ pub fn parse(gpa: std.mem.Allocator, io: std.Io, args: *std.process.Args.Iterato
         printHelp(io);
         return error.MissingTask;
     };
-    return .{ .mode = mode, .backend = backend, .task = t, .workdir = workdir, .cache_path = cache_path, .expect = expect, .max_tokens = max_tokens, .tasks = tasks, .kb_path = kb_path, .kb_max_lines = kb_max_lines, .replay_path = replay_path, .record_path = record_path };
+    return .{ .mode = mode, .backend = backend, .task = t, .workdir = workdir, .cache_path = cache_path, .expect = expect, .max_tokens = max_tokens, .tasks = tasks, .kb_path = kb_path, .kb_max_lines = kb_max_lines, .replay_path = replay_path, .record_path = record_path, .report_path = report_path };
 }
 fn printHelp(io: std.Io) void {
     types.logLine(io, "Yuxi (玉溪): autonomous software evolution engine", .{});

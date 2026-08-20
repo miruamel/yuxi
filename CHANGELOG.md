@@ -1,7 +1,29 @@
 # Changelog
 
 All notable changes to the Yuxi engine are recorded here. Entries group the
-tracked history by capability; commit hashes reference `git log`.
+## Unreleased
+
+### Machine-consumable run health report (feat, §12/§30)
+- `monitoring.writeReport` + `--report[=FILE]` emit a JSON run report (single
+  `TaskResult`, or a `tasks` array + `batch_healthy` for `--tasks`). The report
+  carries the autonomy-health verdict from `monitoring.assessHealth` (the single
+  source of truth) so CI / cron / the co-owner's deploy-gating can read the
+  engine's own health without parsing logs. Strings are JSON-escaped (RFC 8259
+  control range) so semi-trusted task text can't break the document.
+- `main` now exits non-zero when the run verdict is unhealthy (`std.process.exit(1)`),
+  so a healthy mock run stays exit 0 and every existing test path is unaffected.
+  The optional `--report` JSON exposes the same verdict to machine consumers
+  independent of the process status.
+- `monitoring.TaskResult` is now the single shared result shape (was duplicated
+  in `loop.zig`); `loop.runTasks` and `main` both consume it.
+- Invariant fix (§8): split the 202-SLOC `knowledge/knowledge_test.zig` into
+  `knowledge/store_test.zig` (save/load/injectPrompt) and
+  `knowledge/ledger_test.zig` (recordLesson/Health/Critic/Batch); `knowledge/`
+  stays at 3 files.
+- Restored two flags dropped during a prior corruption-recovery:
+  bare `--record` (default `.yuxi_record.txt`) and `--kb-max-lines=N`
+  (was bare-only).
+
 ## v0.2.0 (2026-08-20)
 
 Second tagged release. Batching the 8 merged PRs (#8–#16) since v0.1.0 —
@@ -235,7 +257,7 @@ compatible. Tagged from master 35e48e3 (CI green).
   run's injected lessons explain *why* a prior run failed — not just the numeric
   `failed` outcome. Closes the learning loop for non-critic failures too
   (complementary to `recordCritic`'s qualitative critic reasons). New unit test
-  in `knowledge_test.zig`.
+  in `knowledge/ledger_test.zig`.
 ## v0.1.0 (2026-08-19)
 
 First tagged release of the Yuxi (玉溪) autonomous software-evolution engine,
