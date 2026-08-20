@@ -137,6 +137,32 @@ pub fn recordBatch(alloc: std.mem.Allocator, kb_path: ?[]const u8, summary: []co
     }
 }
 
+/// Return the last `max` lines of `prior` (or all of it when `max` is null), so
+/// a long-lived KB ledger doesn't get loaded into every decomposition prompt in
+/// full. Lessons are newline-terminated, so the split boundary is line-based.
+/// Caller owns the returned slice. If `prior` has `max` or fewer lines, the
+/// whole thing is returned.
+fn tailLessons(alloc: std.mem.Allocator, prior: []const u8, max: ?usize) ![]const u8 {
+    const m = max orelse return alloc.dupe(u8, prior);
+    if (m == 0) return alloc.dupe(u8, "");
+    var total: usize = 0;
+    for (prior) |c| {
+        if (c == '\n') total += 1;
+    }
+    if (total <= m) return alloc.dupe(u8, prior);
+    // (total - m), then keep everything after it.
+    const skip = total - m;
+    var seen: usize = 0;
+    var i: usize = 0;
+    while (i < prior.len) : (i += 1) {
+        if (prior[i] == '\n') {
+            seen += 1;
+            if (seen == skip) return alloc.dupe(u8, prior[i + 1 ..]);
+        }
+    }
+    return alloc.dupe(u8, prior);
+}
+
 /// Build the decomposition user-prompt, prepending prior lessons from the
 /// configured knowledge base when present. Caller owns the returned string.
 pub fn injectPrompt(ctx: *types.Ctx, task: []const u8) ![]const u8 {
@@ -144,7 +170,9 @@ pub fn injectPrompt(ctx: *types.Ctx, task: []const u8) ![]const u8 {
         if (try load(ctx.allocator, kb)) |prior| {
             defer ctx.allocator.free(prior);
             if (prior.len > 0) {
-                return try std.fmt.allocPrint(ctx.allocator, "Prior lessons (avoid repeating failures):\n{s}\n\nTask: {s}", .{ prior, task });
+                const capped = try tailLessons(ctx.allocator, prior, ctx.kb_max_lines);
+                defer ctx.allocator.free(capped);
+                return try std.fmt.allocPrint(ctx.allocator, "Prior lessons (avoid repeating failures):\n{s}\n\nTask: {s}", .{ capped, task });
             }
         }
     }

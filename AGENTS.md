@@ -190,8 +190,12 @@ numeric `critic_rej=N` counter that `recordLesson` records.
   persists that aggregate via `knowledge.recordBatch` (tasks + total deploys +
   unhealthy count) to the configured KB, so `injectPrompt` also learns *batch
   shape* (e.g. every task mock-fell-back, none deployed) — not only the
-  per-run `recordLesson`/`recordHealth` lines each `engine.run` already writes.
-  No-op when `--kb` is unset or the batch is empty.
+- **KB growth bound (feat):** `--kb-max-lines[=N]` caps how many prior lessons
+  `injectPrompt` prepends to the decomposition prompt (defaults to 200 when
+  given bare). The ledger is append-only, so without the cap every run loads
+  the *entire* file into its prompt — unbounded bloat on a long-lived engine.
+  Null by default (no cap = historical behavior). Wire: `config.kb_max_lines`
+  → `Ctx.kb_max_lines` → `knowledge.injectPrompt` → `tailLessons`.
 
 ## Run metrics (observability, feat)
 `Ctx` carries five autonomy-health counters incremented at their event
