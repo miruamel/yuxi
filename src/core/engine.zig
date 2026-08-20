@@ -192,7 +192,7 @@ pub fn newCtx(allocator: std.mem.Allocator, io: std.Io, environ: std.process.Env
         c.* = cache_mod.Cache.init(allocator, cp) catch break :blk null;
         break :blk c;
     };
-    ctx.kb_path = cfg.kb_path;
+    ctx.kb_max_lines = cfg.kb_max_lines;
     ctx.replay_path = cfg.replay_path;
     ctx.record_path = cfg.record_path;
     return ctx;

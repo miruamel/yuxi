@@ -49,6 +49,49 @@ test "knowledge injectPrompt prepends prior lessons from configured kb" {
     try std.testing.expect(std.mem.indexOf(u8, prompt, "do a thing") != null);
 }
 
+test "knowledge injectPrompt caps to kb_max_lines when set" {
+    const alloc = std.testing.allocator;
+    const io = std.Io.Threaded.global_single_threaded.io();
+    const base = "/tmp/yuxi_kb_cap_test";
+    const path = try std.fmt.allocPrint(alloc, "{s}/kb.md", .{base});
+    defer alloc.free(path);
+    defer std.Io.Dir.deleteTree(std.Io.Dir.cwd(), io, base) catch {};
+    // Three lessons, three newlines (each save is newline-terminated).
+    try knowledge.save(alloc, path, "prior lesson A");
+    try knowledge.save(alloc, path, "prior lesson B");
+    try knowledge.save(alloc, path, "prior lesson C");
+    var ctx = try types.Ctx.init(alloc, io, .empty, .no_hitl, .mock, null, "", base);
+    ctx.kb_path = path;
+    ctx.kb_max_lines = 2;
+    const prompt = try knowledge.injectPrompt(&ctx, "do a thing");
+    defer alloc.free(prompt);
+    // Only the last two lessons are injected.
+    try std.testing.expect(std.mem.indexOf(u8, prompt, "prior lesson A") == null);
+    try std.testing.expect(std.mem.indexOf(u8, prompt, "prior lesson B") != null);
+    try std.testing.expect(std.mem.indexOf(u8, prompt, "prior lesson C") != null);
+    try std.testing.expect(std.mem.indexOf(u8, prompt, "do a thing") != null);
+}
+
+test "knowledge injectPrompt is uncapped when kb_max_lines is null" {
+    const alloc = std.testing.allocator;
+    const io = std.Io.Threaded.global_single_threaded.io();
+    const base = "/tmp/yuxi_kb_nocap_test";
+    const path = try std.fmt.allocPrint(alloc, "{s}/kb.md", .{base});
+    defer alloc.free(path);
+    defer std.Io.Dir.deleteTree(std.Io.Dir.cwd(), io, base) catch {};
+    try knowledge.save(alloc, path, "prior lesson A");
+    try knowledge.save(alloc, path, "prior lesson B");
+    try knowledge.save(alloc, path, "prior lesson C");
+    var ctx = try types.Ctx.init(alloc, io, .empty, .no_hitl, .mock, null, "", base);
+    ctx.kb_path = path;
+    ctx.kb_max_lines = null;
+    const prompt = try knowledge.injectPrompt(&ctx, "do a thing");
+    defer alloc.free(prompt);
+    try std.testing.expect(std.mem.indexOf(u8, prompt, "prior lesson A") != null);
+    try std.testing.expect(std.mem.indexOf(u8, prompt, "prior lesson B") != null);
+    try std.testing.expect(std.mem.indexOf(u8, prompt, "prior lesson C") != null);
+}
+
 test "knowledge injectPrompt is plain when kb missing" {
     const alloc = std.testing.allocator;
     const io = std.Io.Threaded.global_single_threaded.io();

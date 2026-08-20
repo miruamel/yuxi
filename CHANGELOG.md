@@ -39,7 +39,15 @@ tracked history by capability; commit hashes reference `git log`.
   by `engine.finishRun`) said `mock fallback dominated`. The loop now calls
   `assessHealth` and prints the verdict per task, so the batch summary and the
   KB can never disagree about health. `engine.finishRun` updated to the struct
-  form. `monitoring_test` covers both a WARN-heavy and a silent cycle.
+- `feat`: bounded knowledge-base injection via `--kb-max-lines[=N]`. The KB
+  ledger (`knowledge.save`) is append-only and `injectPrompt` previously loaded
+  the *entire* file into every decomposition prompt, so a long-lived engine's
+  prompts bloat unbounded (context cost, truncation risk). `injectPrompt` now
+  caps the prepended lessons to the last N lines via `tailLessons`; N defaults
+  to 200 when `--kb-max-lines` is given without `=N`. Null by default (no cap) —
+  identical to historical behavior, so all existing pipelines/tests are
+  unchanged. New tests in `src/knowledge/knowledge_test.zig` cover both the
+  capped and uncapped paths.
 
 
 

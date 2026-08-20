@@ -52,6 +52,12 @@ pub const Ctx = struct {
     /// transcript (entries delimited by a line that is exactly `---`). Null by
     /// default.
     record_path: ?[]const u8 = null,
+    /// Optional cap on how many prior lessons `injectPrompt` prepends to the
+    /// decomposition prompt. Bounds KB growth: without it the full ledger is
+    /// loaded into every run, so a long-lived engine's prompts bloat
+    /// unbounded. Null (no cap) by default — matches historical behavior and
+    /// keeps opt-in tests/existing pipelines unchanged.
+    kb_max_lines: ?usize = null,
     /// Captured responses for the current run, flushed to `record_path` on exit.
     recorded: std.ArrayList([]const u8),
     failures: usize,
