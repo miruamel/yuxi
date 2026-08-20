@@ -22,7 +22,19 @@ All notable changes to the Yuxi engine are recorded here. Entries group the
   stays at 3 files.
 - Restored two flags dropped during a prior corruption-recovery:
   bare `--record` (default `.yuxi_record.txt`) and `--kb-max-lines=N`
-  (was bare-only).
+
+### Run report now carries the verdict reason (feat, §12 follow-on)
+- `monitoring.TaskResult` gained a `verdict: []const u8` field (the
+  machine-readable *why* a run is unhealthy, owned dup of
+  `assessHealth`'s verdict). `writeReport` now emits `"verdict":"…"` per task,
+  so a CI / co-owner gate reading `"healthy":false` can branch on the reason
+  instead of only the boolean. `monitoring.taskResult(alloc, task, ctx, hv)`
+  centralizes the borrow→own dup; `main`/`loop` free their copies explicitly.
+- New unit test covers the report shape for both single and batch, including a
+  verdict containing a JSON-breaking quote (escaped correctly → valid JSON).
+- Also fixed a latent per-element leak in the `--tasks` path: `main` now frees
+  each result's `task` + `verdict` dups before tearing down `results`.
+
 
 ## v0.2.0 (2026-08-20)
 

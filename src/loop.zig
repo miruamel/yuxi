@@ -43,17 +43,12 @@ pub fn runTasks(allocator: std.mem.Allocator, io: std.Io, environ: std.process.E
         // so the batch verdict can never contradict the per-cycle verdict the
         // engine persisted to the KB. The loop must not re-derive "healthy".
         const hv = try monitoring.assessHealth(&ctx);
-        try results.append(allocator, .{
-            .task = try allocator.dupe(u8, line),
-            .deploys = ctx.deploys,
-            .retries = ctx.retries,
-            .critic_rejections = ctx.critic_rejections,
-            .mock_fallbacks = ctx.mock_fallbacks,
-            .token_budgets_exceeded = ctx.token_budgets_exceeded,
-            .healthy = hv.healthy,
-        });
+        // taskResult dups hv.verdict into the result; free the original
+        // verdict now. The caller frees the duped result.verdict (see main).
+        const res = try monitoring.taskResult(allocator, line, &ctx, hv);
+        try results.append(allocator, res);
         types.logLine(io, "[loop] {s} -> deploys={d} retries={d} critic_rej={d} mock_fb={d} budget_ex={d} health={s} verdict=\"{s}\"", .{
-            line,                                  ctx.deploys, ctx.retries, ctx.critic_rejections, ctx.mock_fallbacks, ctx.token_budgets_exceeded,
+            res.task,                              ctx.deploys, ctx.retries, ctx.critic_rejections, ctx.mock_fallbacks, ctx.token_budgets_exceeded,
             if (hv.healthy) "OK" else "UNHEALTHY", hv.verdict,
         });
         if (hv.verdict.len > 0) allocator.free(hv.verdict);

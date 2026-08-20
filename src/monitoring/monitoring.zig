@@ -25,6 +25,11 @@ pub fn report(ctx: *types.Ctx) void {
 /// One engine.run cycle's autonomy-health result. Public + owned by
 /// `monitoring` so both `loop.runTasks` (batch) and `main` (single run) share a
 /// single result shape instead of each defining their own copy.
+///
+/// `verdict` is a caller-owned, NUL-safe slice (may be empty). The constructor
+/// `taskResult` dups `HealthVerdict.verdict` into it; the caller frees it. A
+/// report writer may dup it again safely — `verdict` holds no internal
+/// allocator reference, so ownership is unambiguous.
 pub const TaskResult = struct {
     task: []const u8,
     deploys: usize,
@@ -33,7 +38,34 @@ pub const TaskResult = struct {
     mock_fallbacks: usize,
     token_budgets_exceeded: usize,
     healthy: bool,
+    /// Machine-readable reason the run is unhealthy (empty when healthy).
+    /// Owned by the holder of the TaskResult (free alongside the other fields).
+    verdict: []const u8,
 };
+
+/// Build a `TaskResult` from a finished `Ctx` and its `HealthVerdict`, owning a
+/// dup of `hv.verdict`. Centralizes the borrow→own copy so the caller can free
+/// `hv.verdict` immediately without stranding the report's copy. `task` is the
+/// task label (from `cfg.task` / the batch line), since `Ctx` doesn't carry it.
+/// On OOM during the dup, the result carries an empty verdict rather than
+/// failing the whole run report.
+pub fn taskResult(alloc: std.mem.Allocator, task: []const u8, ctx: *types.Ctx, hv: HealthVerdict) !TaskResult {
+    // Both `task` and the verdict dup are owned by the returned struct: the
+    // batch path borrows `task` from the tasks file (freed before `results`
+    // is returned), so storing it directly would dangle.
+    const tdup = if (task.len > 0) alloc.dupe(u8, task) catch "" else "";
+    const vdup = if (hv.verdict.len > 0) alloc.dupe(u8, hv.verdict) catch "" else "";
+    return .{
+        .task = tdup,
+        .deploys = ctx.deploys,
+        .retries = ctx.retries,
+        .critic_rejections = ctx.critic_rejections,
+        .mock_fallbacks = ctx.mock_fallbacks,
+        .token_budgets_exceeded = ctx.token_budgets_exceeded,
+        .healthy = hv.healthy,
+        .verdict = vdup,
+    };
+}
 
 /// Emit a machine-consumable run report (JSON) so CI / cron / the co-owner's
 /// deploy-gating can read the engine's own autonomy-health verdict without
@@ -70,19 +102,6 @@ pub fn writeReport(allocator: std.mem.Allocator, io: std.Io, path: []const u8, s
     try fs.writeFileAlloc(allocator, path, buf.items);
 }
 
-/// Append one `TaskResult` as a JSON object to `buf`. String fields are escaped
-/// (control chars + `"`/`\`) so semi-trusted task text can never break the
-/// document — same discipline as `http.jsonEscape`.
-fn appendResult(alloc: std.mem.Allocator, buf: *std.ArrayList(u8), r: TaskResult) !void {
-    const esc = try escapeJson(alloc, r.task);
-    defer alloc.free(esc);
-    const obj = try std.fmt.allocPrint(alloc, "{{\"task\":\"{s}\",\"deploys\":{d},\"retries\":{d},\"critic_rejections\":{d},\"mock_fallbacks\":{d},\"token_budgets_exceeded\":{d},\"healthy\":{s}}}", .{
-        esc, r.deploys, r.retries, r.critic_rejections, r.mock_fallbacks, r.token_budgets_exceeded, if (r.healthy) "true" else "false",
-    });
-    defer alloc.free(obj);
-    try buf.appendSlice(alloc, obj);
-}
-
 /// Minimal JSON string escape: `"`, `\`, and control chars U+0000–U+001F
 /// (RFC 8259). Reused so a report never carries malformed JSON from a task
 /// containing raw control bytes.
@@ -104,6 +123,17 @@ fn escapeJson(alloc: std.mem.Allocator, s: []const u8) ![]u8 {
         }
     }
     return out.toOwnedSlice(alloc);
+}
+fn appendResult(alloc: std.mem.Allocator, buf: *std.ArrayList(u8), r: TaskResult) !void {
+    const esc_task = try escapeJson(alloc, r.task);
+    defer alloc.free(esc_task);
+    const esc_verdict = try escapeJson(alloc, r.verdict);
+    defer alloc.free(esc_verdict);
+    const obj = try std.fmt.allocPrint(alloc, "{{\"task\":\"{s}\",\"deploys\":{d},\"retries\":{d},\"critic_rejections\":{d},\"mock_fallbacks\":{d},\"token_budgets_exceeded\":{d},\"healthy\":{s},\"verdict\":\"{s}\"}}", .{
+        esc_task, r.deploys, r.retries, r.critic_rejections, r.mock_fallbacks, r.token_budgets_exceeded, if (r.healthy) "true" else "false", esc_verdict,
+    });
+    defer alloc.free(obj);
+    try buf.appendSlice(alloc, obj);
 }
 pub const HealthVerdict = struct {
     verdict: []const u8,

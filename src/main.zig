@@ -14,26 +14,27 @@ pub fn main(init: std.process.Init) !void {
     if (cfg.tasks) |tasks_path| {
         var results = try loop.runTasks(arena, io, init.minimal.environ, cfg, tasks_path);
         const healthy = try emitReportAndExit(arena, io, cfg.report_path, null, results.items);
+        // results owns task+verdict dups per element; deinit only frees the
+        // array, so release the element slices explicitly before tearing down.
+        for (results.items) |r| {
+            arena.free(r.task);
+            arena.free(r.verdict);
+        }
         results.deinit(arena);
         if (!healthy) std.process.exit(1);
         return;
     }
     var ctx = try engine.newCtx(arena, io, init.minimal.environ, cfg, cfg.workdir);
     try engine.run(arena, io, &ctx, cfg.task);
-    // The run's health verdict is computed once, from the single source of
-    // truth (monitoring.assessHealth). A healthy run exits 0; an unhealthy one
-    // exits 1 so CI / cron can gate on process status (§30), and the optional
-    // --report JSON carries the same verdict to machine consumers.
+    // The run's health verdict is computed once from the single source of truth
+    // (monitoring.assessHealth). A healthy run exits 0; an unhealthy one exits 1
+    // so CI/cron can gate on process status (§30); the optional --report JSON
+    // carries the same verdict to machine consumers.
     const hv = try monitoring.assessHealth(&ctx);
-    const single = monitoring.TaskResult{
-        .task = cfg.task,
-        .deploys = ctx.deploys,
-        .retries = ctx.retries,
-        .critic_rejections = ctx.critic_rejections,
-        .mock_fallbacks = ctx.mock_fallbacks,
-        .token_budgets_exceeded = ctx.token_budgets_exceeded,
-        .healthy = hv.healthy,
-    };
+    // taskResult dups hv.verdict into single.verdict; free both. The report
+    // (inside emitReportAndExit) reads single by reference and does not own it.
+    const single = try monitoring.taskResult(arena, cfg.task, &ctx, hv);
+    defer arena.free(single.verdict);
     const healthy = try emitReportAndExit(arena, io, cfg.report_path, single, null);
     ctx.allocator.free(hv.verdict);
     if (!healthy) std.process.exit(1);

@@ -242,7 +242,16 @@ run report (single `TaskResult`, or `tasks[]` + `batch_healthy` for `--tasks`),
 reusing the `assessHealth` verdict. `main` exits `1` when the verdict is
 unhealthy (mock default stays exit 0). This is the engine reporting its own
 health — it does NOT implement the issue #2 deploy-gating fork; it only makes
-the verdict observable so a co-owner/CI can gate on it externally.
+`TaskResult.verdict` carries the machine-readable reason (dup of
+`assessHealth.verdict`) so a gate can branch on *why*, not just the boolean.
+
+## Tooling caveat: no CodeGraph in this harness
+The autonomy charter (§4/§5) assumes a CodeGraph instrument. This project's
+harness exposes **no CodeGraph tool** — substitute `ast_grep` (structural),
+`grep` (call sites), `lsp` (references/definition), and `glob` (layout) for the
+graph passes the charter describes. Re-sync the mental graph after every
+structural change by re-reading the touched modules; don't assume a stale
+module map. Do NOT waste a cycle searching for a `codegraph` tool.
 
 ## Smoke test & gotchas
 End-to-end check, offline (no API key):
@@ -381,7 +390,13 @@ never a bare `ctx.allocator.free(e)` that leaves a dangling pointer for a later
   Closes the §30 runtime-feedback visibility gap without building the issue #2
   deploy-gating fork. Also split `knowledge/knowledge_test.zig` (202 SLOC, §8)
   into `store_test.zig` + `ledger_test.zig`, and restored dropped `--record` /
-  `--kb-max-lines=N` flag handlers.
+- `feat`: run report now carries the verdict reason — `monitoring.TaskResult`
+  gained `verdict: []const u8` (owned dup of `assessHealth.verdict`);
+  `writeReport` emits `"verdict":"…"` so a gate branches on *why* a run is
+  unhealthy, not just the boolean. `monitoring.taskResult` centralizes the
+  borrow→own dup; added a `writeReport` shape test (incl. JSON-breaking quote
+  escaping) and fixed a latent per-element leak in the `--tasks` path.
+
 
 Resolved (no longer open): issue #1 (gateway rate-limit no-op) — the dead
 per-call counter was removed in `dc7f217`; gateway now does auth + validation
