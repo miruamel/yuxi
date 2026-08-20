@@ -10,7 +10,18 @@ tracked history by capability; commit hashes reference `git log`.
   lesson, logs `engine: ABORT at plan critic`, and returns before any codegen
   or deploy. Always-on, fail-fast, non-breaking — the default backend returns
   APPROVE. New `src/core/selfcorr/plan_gate_test.zig` exercises the reject
-  path end-to-end via the `Ctx.llm_fn` seam. Resolves §14 feature-bias drift
+- `feat`: bounded HTTP retry for the network LLM backends (`.openai`/`.local`).
+  `transport.complete` delegated the network path to a new `llm/http.zig`
+  module whose `http.complete` retries the `curl` call up to 3 times with
+  linear backoff (250ms·attempt) and passes `-m 60 --connect-timeout 10`, so a
+  transient 5xx / connection reset / timeout no longer aborts the whole build
+  and triggers a silent `resilience.fallback` to the mock backend (degrading
+  the run with no visible signal). A persistent failure still propagates
+  `error.RequestFailed` for the existing fallback path to handle. The
+  mock/replay/cache paths are untouched. `transport.zig` shrank to a dispatch
+  stub; the JSON-escape and content-extraction unit tests moved into `http.zig`
+  (registered in `build.zig`). New test asserts the retry loop fails fast
+  (error.RequestFailed, no hang) against an unreachable endpoint.
 - `fix`: plan-reject no longer truncates the learning loop. The LAYER 2.5
   plan critic gate in `engine.run` aborted with a bare `return`, skipping
   LAYER 7-9 (resilience summary, `knowledge.recordLesson` with `critic_rej=N`,
