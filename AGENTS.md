@@ -2,6 +2,11 @@
 
 Zig 0.16.0 project rooted at `src/` (root = `src/`). Implements the autonomous
 evolution engine described in `DESIGN.md`.
+Versioning is git-tag based — no `version` constant lives in `src/` or
+`build.zig`, so a release is purely a tag + `gh release` from a CI-green master.
+v0.1.0 (2026-08-19) and v0.2.0 (2026-08-20) are source tags (no binaries
+attached). Cut a release when a coherent batch of merged work accumulates
+(§28) — not per-PR.
 
 ## Build & Run
 ```bash
