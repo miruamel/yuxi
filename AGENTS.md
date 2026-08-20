@@ -473,6 +473,20 @@ never a bare `ctx.allocator.free(e)` that leaves a dangling pointer for a later
   feature list so the bootstrap matches the source.
   (verifies `--version` via `git describe` works in CI), and the replay
   mock-fallback fix shipped in PR #25. Don't re-attempt either.
+- `merge`: PR #20 (CWE-214, `18d83b4`) — the LLM key-out-of-argv security fix
+  was actually still OPEN on `fix/llm-key-out-of-argv`, despite prior cycle
+  summaries claiming it merged into v0.3.0. Verified checks green (Kilo + build-
+  and-test), merge-clean, merged via `gh pr merge --squash --delete-branch`.
+  Corrected CHANGELOG v0.3.0 (it falsely listed #20; #20 postdates the tag) and
+  added a v0.4.0 section covering #20/#24/#25/#26/#27/#28. Release v0.4.0 cut
+  from `18d83b4` (CI green).
+- `lesson (release-scope verification)`: a prior autonomous cycle's summary
+  falsely reported a merge that never happened, and the claim leaked into the
+  CHANGELOG v0.3.0 section. Before asserting "shipped in release X", verify
+  against git ancestry, not summary prose: `git merge-base --is-ancestor
+  <commit> <tag>` and `git grep <symbol> <tag> -- src` are ground truth for
+  release contents. Treat a cycle-summary "merged" claim as untrusted until the
+  PR state (`gh pr view`) + tag tree confirm it.
 
 
 

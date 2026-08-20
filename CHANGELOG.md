@@ -1,6 +1,30 @@
 # Changelog
 
-## Unreleased
+## v0.4.0 (2026-08-20)
+Fourth tagged release. Batching 6 merged PRs (#20, #24, #25, #26, #27, #28) since v0.3.0 —
+a security fix (CWE-214, #20), docs/help sync (#24), offline replay resilience (#25),
+the `--max-steps` autonomy-safety cap (#26), the §30 observability correction (#27),
+and its KB-ledger follow-on (#28) that close the `--max-steps` learn loop. No breaking
+changes; the v0.3.0 flag surface and JSON report schema are forward compatible.
+Tagged from master (CI green).
+
+### Keep LLM API key out of the process table (fix, CWE-214, PR #20)
+- `llm/http.zig` passed the `Authorization: Bearer <key>` header as a curl
+  `-H` argv element, making the LLM secret world-readable via `ps` / process
+  listing on any shared host or CI runner. It now writes the bearer header to a
+  `0600` temp config file and hands it to curl via `-K`, so the key never
+  enters argv. `fs.writeFileSecret` adds the `0600` open mode; the temp file is
+  deleted after the request. Added a regression test asserting the header lands
+  in the file (proving it left argv) and the file is cleaned up.
+
+### Docs/help sync with shipped flag surface (fix, repo-hygiene, §24, PR #24)
+- `config.printHelp` omitted `--tasks FILE` (batch plan mode) though `config.parse`
+  already accepted it and README listed it; the help line is now present so
+  `--help` is the authoritative flag list README claims. README's Flags +
+  Environment block gained `--report`, `--health-hook`/`--always-hook`,
+  `-V/--version`, and the CWE-214 note (bearer key via `curl -K`, never argv).
+  `config_test` guards the `--tasks` parse contract. No engine behavior change.
+
 
 ### Offline replay degrades to mock on exhaustion (fix, reliability, §27/§29)
 - `transport.complete` used to hard-fail the whole offline run
@@ -28,17 +52,39 @@
   end-to-end abort test cover it. This is an autonomy-safety bound only; it
   does not touch the reserved deploy-gating fork tracked in issue #2.
 
+### `--max-steps` cap now a distinct health verdict (fix, §30, PR #27)
+- The `--max-steps` abort (#26) was emitted as the generic `no deploy; `
+  verdict, polluting the next cycle's `injectPrompt` with a false "plan
+  failed to build" signal. Mirrors `token_budgets_exceeded`: `Ctx` gains
+  `max_steps_exceeded`; `orchestrator.run` increments it on cap hit (and logs
+  the reason); `monitoring.assessHealth` emits a dedicated
+  `plan exceeded max-steps; ` WARN so the cap hit is machine-distinguishable
+  from a generic failure. `orchestrator_test` asserts the counter == 1.
+
+### Knowledge ledger now records `--max-steps` cap hits (fix, learn-loop, PR #28)
+- `knowledge.recordLesson` — the core learn→inject ledger — omitted
+  `max_steps_exceeded`, so a `--max-steps` abort was never persisted and future
+  `injectPrompt` steering stayed blind to a blown cap. Mirrors
+  `token_budgets_exceeded`: both `allocPrint` lesson formats now append
+  `max_steps_ex={d}` and the doc-comment counter list includes cap hits.
+  `ledger_test` asserts `max_steps_ex=1` appears in the loaded KB.
+
+### Carried forward (open co-owner forks)
+- #2 --dry-run/plan-mode and --hitl deploy gating — not addressed this release
+  (deliberate: reserved fork, surfaced on #2 for co-owner decision).
+
 
 ## v0.3.0 (2026-08-20)
 
-Third tagged release. Batching the 6 merged PRs (#18–#23) since v0.2.0 —
+Third tagged release. Batching the 5 merged PRs (#18, #19, #21, #22, #23) since v0.2.0 —
 machine-consumable health report + exit code (#18), verdict reason in the
-report (#19), LLM API key out of argv (CWE-214, #20), external health-hook
+report (#19), external health-hook
 gating (#21), CLI parse-error exit-code contract (#22), and a build-time
 version stamp + `--version` (#23). The observability batch makes the engine's
 own autonomy-health observable to external gates, with `--version` and a
 report `version` field so a gate can correlate verdicts with the exact
-engine version. Tagged from master 134f9b2 (CI green).
+engine version. (The LLM key-out-of-argv CWE-214 fix is PR #20, which merged
+after this tag and ships in v0.4.0.) Tagged from master 134f9b2 (CI green).
 
 
 ### Machine-consumable run health report (feat, §12/§30)
@@ -72,14 +118,6 @@ engine version. Tagged from master 134f9b2 (CI green).
   verdict containing a JSON-breaking quote (escaped correctly → valid JSON).
 - Also fixed a latent per-element leak in the `--tasks` path: `main` now frees
 
-### Keep LLM API key out of the process table (fix, CWE-214, PR #20)
-- `llm/http.zig` passed the `Authorization: Bearer <key>` header as a curl
-  `-H` argv element, making the LLM secret world-readable via `ps` / process
-  listing on any shared host or CI runner. It now writes the bearer header to a
-  `0600` temp config file and hands it to curl via `-K`, so the key never
-  enters argv. `fs.writeFileSecret` adds the `0600` open mode; the temp file is
-  deleted after the request. Added a regression test asserting the header lands
-  in the file (proving it left argv) and the file is cleaned up.
 
 ### External health gating via `--health-hook` (feat, §12 follow-on, PR #21)
 - New `--health-hook <CMD>`: after the run, `<CMD> <report>` is spawned when the
