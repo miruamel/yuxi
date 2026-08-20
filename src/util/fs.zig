@@ -64,6 +64,18 @@ fn mkdirOne(alloc: std.mem.Allocator, path: []const u8) !void {
 pub fn deleteFile(io: std.Io, path: []const u8) !void {
     return std.Io.Dir.deleteFile(std.Io.Dir.cwd(), io, path);
 }
+/// Returns true if `path` exists (regardless of whether it is readable).
+/// Used by tests to assert deployment artifacts landed (and intermediates
+/// were cleaned up). Moved here from engine.zig to keep that file under the
+/// 200-SLOC invariant (§8).
+pub fn fileExists(path: []const u8) bool {
+    const fd = std.posix.openat(std.posix.AT.FDCWD, path, std.posix.O{ .ACCMODE = .RDONLY }, 0) catch |e| {
+        if (e == error.FileNotFound) return false;
+        return true;
+    };
+    _ = std.os.linux.close(fd);
+    return true;
+}
 
 test "ensureDir creates nested parents and is idempotent" {
     const alloc = std.testing.allocator;

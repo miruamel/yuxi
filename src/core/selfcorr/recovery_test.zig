@@ -68,12 +68,12 @@ test "engine.run self-corrects a broken first build via retry" {
     // Recovery: the verified build was deployed (gen_final.zig present).
     const final_path = try std.fmt.allocPrint(allocator, "{s}/gen_final.zig", .{workdir});
     defer allocator.free(final_path);
-    try std.testing.expect(engine.fileExists(final_path));
+    try std.testing.expect(fs.fileExists(final_path));
     // Intermediate step files cleaned up.
     for (0..3) |i| {
         const p = try std.fmt.allocPrint(allocator, "{s}/gen_{d}.zig", .{ workdir, i });
         defer allocator.free(p);
-        try std.testing.expect(!engine.fileExists(p));
+        try std.testing.expect(!fs.fileExists(p));
     }
 }
 
@@ -142,11 +142,11 @@ test "engine.run recovers from an LLM-critic REJECT via regenerate" {
     try std.testing.expect(ctx.deploys >= 1);
     const final_path = try std.fmt.allocPrint(allocator, "{s}/gen_final.zig", .{workdir});
     defer allocator.free(final_path);
-    try std.testing.expect(engine.fileExists(final_path));
+    try std.testing.expect(fs.fileExists(final_path));
     for (0..3) |i| {
         const p = try std.fmt.allocPrint(allocator, "{s}/gen_{d}.zig", .{ workdir, i });
         defer allocator.free(p);
-        try std.testing.expect(!engine.fileExists(p));
+        try std.testing.expect(!fs.fileExists(p));
     }
 
     // The critic rejection reason must be persisted as a durable lesson so a

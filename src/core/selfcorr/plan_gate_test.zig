@@ -56,7 +56,7 @@ test "engine.run aborts on a rejected plan before codegen" {
     // Plan critic rejected -> run aborts before codegen: no deploy, no artifact.
     const final_path = try std.fmt.allocPrint(allocator, "{s}/gen_final.zig", .{workdir});
     defer allocator.free(final_path);
-    try std.testing.expect(!engine.fileExists(final_path));
+    try std.testing.expect(!fs.fileExists(final_path));
     try std.testing.expect(ctx.deploys == 0);
     // The plan rejection is counted + persisted as a critic lesson.
     try std.testing.expect(ctx.critic_rejections >= 1);

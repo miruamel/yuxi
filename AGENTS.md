@@ -103,6 +103,19 @@ workdir repo is created.
   user prefix. Injected-backend tests that distinguish the two must key on
   those prefixes, not on a shared "critic" substring — otherwise the plan call
   is misrouted and desyncs the replay/test transcript.
+- **Plan-gate learning loop must not be truncated (fix):** the LAYER 2.5
+  plan-reject path in `engine.run` was a bare `return` that skipped LAYER
+  7-9 (resilience, `recordLesson` with `critic_rej=N`, `monitoring.report` +
+  `recordHealth`). So a rejected plan never wrote its numeric critic-rejection
+  counter to the KB ledger and never persisted a health verdict — the next
+  cycle's `injectPrompt` couldn't steer away from a plan-shaped failure. The
+  early aborts (gateway, orchestrator, plan critic, no-verify) now all tail-call
+  `finishRun` (LAYER 7-9), so every exit path records outcome + health. Don't
+  re-introduce a bare early-return in `engine.run`.
+- **`engine.fileExists` moved to `util/fs.zig`:** it's a pure filesystem
+  predicate; keeping it in engine.zig pushed that file past the 200-SLOC
+  invariant (§8). Tests now call `fs.fileExists`, not `engine.fileExists`.
+
 
 
 ## AI review bot (co-owner signal)
@@ -303,7 +316,7 @@ never a bare `ctx.allocator.free(e)` that leaves a dangling pointer for a later
   parsed but the engine auto-deploys on verified regardless of mode. **My lean:
   keep auto-deploy as default (honors the autonomous owner mandate) and make
   `--hitl` gate only the write/commit step, not compile+run eval** — human
-  approval before the artifact is persisted, but the loop still self-verifies.
+- `HEAD` fix(core): plan-reject no longer truncates the learning loop — early aborts (gateway/orchestrator/plan-critic/no-verify) now tail-call `finishRun` (LAYER 7-9) so every exit path records the outcome + health verdict to the KB; moved `fileExists` to `util/fs.zig` to keep `engine.zig` ≤200 SLOC (§8).
   **Stakes:** gating eval behind a human breaks the autonomous loop and the §30
   runtime-feedback signal; gating only persistence keeps oversight at the
   irreversible boundary without throttling self-correction.
