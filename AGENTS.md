@@ -316,7 +316,8 @@ never a bare `ctx.allocator.free(e)` that leaves a dangling pointer for a later
 - `HEAD` feat(core): plan-quality critic gate — review decomposition before codegen (LAYER 2.5); fail-fast on REJECT, persist plan lesson. New plan_gate_test.zig. Resolves §14 feature-bias drift (5 non-feature cycles).
 - `--dry-run` / plan mode (Product-shaping fork; needs co-owner call): what
   should it surface — the decomposed `STEP:` plan only, the critic verdict on
-- `HEAD` fix(builder): builder.run now increments `ctx.mock_fallbacks` on a transport-error fallback, matching `step.zig`; previously the autonomy-health signal ("mock fallback dominated") and `recordLesson`'s `mock_fb` under-counted builder-level fallbacks. Added `src/builder/builder_test.zig` (fail-then-succeed seam). Registered it in `build.zig` test_files.
+- `HEAD` refactor(monitoring): `assessHealth` is now the single source of truth for cycle health — returns `HealthVerdict { verdict, healthy }`. `loop.runTasks` no longer re-derives `healthy` (old `deploys>0 && budget==0` ignored `mock_fallback>deploys`); it calls `assessHealth` and prints the verdict per task, so the batch report can never contradict the per-cycle verdict persisted to the KB. `engine.finishRun` updated to the struct form. `monitoring_test` covers both shapes.
+
   critic verdict, not full eval** — eval requires a full build and defeats the
   "cheap preview before spending tokens" purpose; plan+verdict is enough to
   sanity-check direction. **Stakes:** surfacing full eval turns the mode into a

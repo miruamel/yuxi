@@ -30,7 +30,17 @@ tracked history by capability; commit hashes reference `git log`.
   fallbacks, letting a mock-dominated cycle slip past the health check. The
   fallback path now increments `ctx.mock_fallbacks`, so the signal fires
   regardless of where the fallback originated. New `src/builder/builder_test.zig`
-  covers the fail-then-succeed seam path and is registered in `build.zig`.
+- `refactor`: `monitoring.assessHealth` is now the single source of truth for
+  cycle health. It returns `HealthVerdict { verdict, healthy }` (caller-owned
+  verdict). `loop.runTasks` previously computed its own `healthy` as
+  `deploys > 0 and token_budgets_exceeded == 0`, which *ignored* the
+  `mock_fallbacks > deploys` WARN that `assessHealth` emits — so a batch report
+  could say `health=OK` for a cycle whose per-run verdict (persisted to the KB
+  by `engine.finishRun`) said `mock fallback dominated`. The loop now calls
+  `assessHealth` and prints the verdict per task, so the batch summary and the
+  KB can never disagree about health. `engine.finishRun` updated to the struct
+  form. `monitoring_test` covers both a WARN-heavy and a silent cycle.
+
 
 
 
