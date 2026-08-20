@@ -71,7 +71,28 @@ fn jsonEscape(allocator: std.mem.Allocator, s: []const u8) ![]u8 {
             '\n' => try out.appendSlice(allocator, "\\n"),
             '\r' => try out.appendSlice(allocator, "\\r"),
             '\t' => try out.appendSlice(allocator, "\\t"),
-            else => try out.append(allocator, c),
+            else => {
+                if (c == 0x08) {
+                    try out.appendSlice(allocator, "\\b");
+                } else if (c == 0x0C) {
+                    try out.appendSlice(allocator, "\\f");
+                } else {
+                    // RFC 8259 §7: every control character (U+0000–U+001F) MUST
+                    // be escaped. The prompt path carries semi-trusted input (KB
+                    // lessons, recorded evaluator errors, task text) that can
+                    // contain raw control bytes (e.g. ESC, form-feed from
+                    // terminal output). Leaving them unescaped produces a
+                    // malformed request body, which the endpoint rejects →
+                    // silent mock fallback.
+                    if (c < 0x20) {
+                        var buf: [6]u8 = undefined;
+                        const n = std.fmt.bufPrint(&buf, "\\u{X:0>4}", .{c}) catch unreachable;
+                        try out.appendSlice(allocator, buf[0..n.len]);
+                    } else {
+                        try out.append(allocator, c);
+                    }
+                }
+            },
         }
     }
     return out.toOwnedSlice(allocator);
@@ -135,4 +156,12 @@ test "jsonEscape escapes JSON string syntax" {
     const got = try jsonEscape(a, "a\"b\\c\nd");
     defer a.free(got);
     try std.testing.expectEqualStrings("a\\\"b\\\\c\\nd", got);
+}
+test "jsonEscape escapes full control-char range per RFC 8259" {
+    const a = std.testing.allocator;
+    // A raw ESC (0x1B) and vertical tab (0x0B) — control chars that previously
+    // leaked unescaped into the request body, producing malformed JSON.
+    const got = try jsonEscape(a, "x\x1by\x0bz");
+    defer a.free(got);
+    try std.testing.expectEqualStrings("x\\u001By\\u000Bz", got);
 }
