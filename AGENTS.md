@@ -12,12 +12,15 @@ evolution engine described in `DESIGN.md`.
 ```
 
 ## CLI flags
+`yuxi --help` prints the authoritative, always-current flag list — treat it as
+the source of truth and keep it in sync when adding flags (the help string
+lives in `core/config/config.zig: printHelp`).
 - `--hitl` / `--no-hitl` — human-approval mode vs fully autonomous (default no_hitl).
 - `--mock` / `--openai` / `--local` — LLM backend.
 - `--task TEXT` or trailing arg — the task prompt.
 - `--out DIR` — workdir (default `ae_out/`); isolated git repo lives here.
 - `--cache[=DIR]` — opt-in on-disk LLM-response cache (default `.yuxi_cache`).
-- --replay[=FILE] — opt-in recorded-LLM-response file; `transport.complete` serves entries in call order for `.openai`/`.local` without calling the network (offline CI/tests). Entries delimited by `---` lines.
+- `--replay[=FILE]` — opt-in recorded-LLM-response file; `transport.complete` serves entries in call order for `.openai`/`.local` without calling the network (offline CI/tests). Entries delimited by `---` lines.
 - `--record[=FILE]` — opt-in capture of every real (non-seam, non-replay) LLM
   response into a file; `engine.run` flushes them as `--replay`-compatible
   entries (delimited by `---` lines). Default file `.yuxi_record.txt`. Pair
@@ -26,6 +29,11 @@ evolution engine described in `DESIGN.md`.
 - `--max-tokens N` — soft LLM-spend ceiling; `engine.run` aborts the build loop
   once `ctx.tokens` reaches N, records `engine: token budget exceeded`, deploys
   nothing. Default off.
+- `--kb[=DIR]` / `--kb-max-lines[=N]` — knowledge ledger path and injection cap
+  (bare `--kb-max-lines` = 200, default off). See Knowledge base (feat) below.
+- `--tasks FILE` — batch mode: run each non-comment, non-blank line as an
+  isolated engine cycle and aggregate the autonomy-health report (see
+  `loop.zig`).
 
 ## Verify
 ```bash
@@ -36,7 +44,7 @@ evolution engine described in `DESIGN.md`.
 
 ## Architecture (`src/`)
 - `main.zig` — entry; loads config, optional `--cache`, builds `Ctx`, runs engine.
-- `core/{types,config,engine,compose}.zig` — `Ctx` state, CLI parse, the 9-layer loop, fragment composition.
+- `core/{types,engine,compose}.zig` + `core/config/config.zig` — `Ctx` state, the 9-layer loop, fragment composition; CLI parse lives in `core/config/`.
 - `llm/transport.zig` — single LLM entry `complete(...)`. Backends: mock (offline),
   openai (`OPENAI_BASE`/`OPENAI_API_KEY`), local (ollama `LOCAL_BASE`).
   `llm/http.zig` — network path: `http.complete` shells `curl` with bounded

@@ -18,8 +18,13 @@ runs fully offline for development and testing.
 ```
 
 Flags: `--mock|--openai|--local`, `--hitl|--no-hitl`, `--task TEXT`,
-`--out DIR`, `--cache[=DIR]`, `--expect TEXT`, `--max-tokens N`. Environment: `OPENAI_API_KEY` /
-`OPENAI_BASE`, `LOCAL_BASE`, `AE_TOKEN` (optional gateway auth token).
+`--out DIR`, `--expect TEXT`, `--max-tokens N`, `--cache[=DIR]`,
+`--replay[=FILE]`, `--record[=FILE]`, `--kb[=DIR]`, `--kb-max-lines[=N]`,
+`--tasks FILE`. `yuxi --help` prints the authoritative, always-current list.
+Environment: `OPENAI_API_KEY` / `OPENAI_BASE`, `LOCAL_BASE`,
+`AE_TOKEN` (optional gateway auth token). The OpenAI/local backend shells out
+to `curl` (array argv, no shell) with bounded retry + timeouts — see
+`src/llm/http.zig`.
 
 ## Pipeline
 
@@ -53,8 +58,10 @@ Gateway -> Orchestrator -> (Builder -> Critic)* -> Compose -> Evaluator -> Deplo
 - **Knowledge / Monitoring** — structured event log and runtime metrics
   (events, tokens, backend, cache hits/misses). Per-run autonomy-health
   counters track `critic_rejections`, `mock_fallbacks`, `retries`,
-  `deploys`, `token_budgets_exceeded` so the loop reads its own effectiveness
-  (§30/§32).
+  `deploys`, `network_retries` (recovered HTTP retries), and
+  `token_budgets_exceeded` so the loop reads its own effectiveness (§30/§32).
+  `network_retries` is observability-only and does not trip the health verdict
+  (a recovered transient blip is not a degradation).
 
 ## Safety
 

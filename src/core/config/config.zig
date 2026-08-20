@@ -76,5 +76,25 @@ pub fn parse(gpa: std.mem.Allocator, io: std.Io, args: *std.process.Args.Iterato
 }
 fn printHelp(io: std.Io) void {
     types.logLine(io, "Yuxi (玉溪): autonomous software evolution engine", .{});
-    types.logLine(io, "yuxi [--hitl|--no-hitl] [--mock|--openai|--local] [--max-tokens N] [--cache[=DIR]] [--kb[=DIR]] [--replay[=FILE]] [--record[=FILE]] [--out DIR] [--task TEXT] [--expect TEXT] [--tasks FILE] TASK", .{});
+    types.logLine(io, "Usage: yuxi [options] [TASK]", .{});
+    types.logLine(io, "", .{});
+    types.logLine(io, "Mode:", .{});
+    types.logLine(io, "  --hitl / --no-hitl   human-approval vs autonomous (default --no-hitl)", .{});
+    types.logLine(io, "Backend:", .{});
+    types.logLine(io, "  --mock / --openai / --local   LLM backend (default --mock)", .{});
+    types.logLine(io, "Task:", .{});
+    types.logLine(io, "  --task TEXT          task prompt (may also be a trailing arg)", .{});
+    types.logLine(io, "  --out DIR            workdir for this run (default ae_out)", .{});
+    types.logLine(io, "  --expect TEXT        behavioral verification string", .{});
+    types.logLine(io, "  --max-tokens N       soft LLM-spend ceiling; default off", .{});
+    types.logLine(io, "Knowledge:", .{});
+    types.logLine(io, "  --kb[=DIR]           knowledge ledger path", .{});
+    types.logLine(io, "  --kb-max-lines[=N]  cap injected lessons (bare=200, default off)", .{});
+    types.logLine(io, "LLM I/O:", .{});
+    types.logLine(io, "  --cache[=DIR]        opt-in on-disk LLM response cache (default .yuxi_cache)", .{});
+    types.logLine(io, "  --replay[=FILE]      serve recorded responses offline", .{});
+    types.logLine(io, "  --record[=FILE]      capture responses to file (default .yuxi_record.txt)", .{});
+    types.logLine(io, "Batch:", .{});
+    types.logLine(io, "  --tasks FILE         run each line as an isolated cycle", .{});
+    types.logLine(io, "  -h / --help          show this help", .{});
 }

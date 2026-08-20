@@ -11,7 +11,7 @@ pub fn build(b: *std.Build) void {
     // module; each consumer must `addImport` it (no implicit global scope).
     const types = b.addModule("types", .{ .root_source_file = b.path("src/core/types.zig"), .target = target, .optimize = optimize });
     const compose = b.addModule("compose", .{ .root_source_file = b.path("src/core/compose.zig"), .target = target, .optimize = optimize });
-    const config = b.addModule("config", .{ .root_source_file = b.path("src/core/config.zig"), .target = target, .optimize = optimize });
+    const config = b.addModule("config", .{ .root_source_file = b.path("src/core/config/config.zig"), .target = target, .optimize = optimize });
     const engine = b.addModule("engine", .{ .root_source_file = b.path("src/core/engine.zig"), .target = target, .optimize = optimize });
     const step = b.addModule("step", .{ .root_source_file = b.path("src/core/step.zig"), .target = target, .optimize = optimize });
     const gateway = b.addModule("gateway", .{ .root_source_file = b.path("src/gateway/gateway.zig"), .target = target, .optimize = optimize });
@@ -63,7 +63,7 @@ pub fn build(b: *std.Build) void {
     const test_files = [_][]const u8{
         "src/builder/builder.zig",
         "src/builder/builder_test.zig",
-        "src/core/engine.zig",
+        "src/config_test.zig",
         "src/core/compose.zig",
         "src/core/selfcorr/gate_test.zig",
         "src/core/selfcorr/recovery_test.zig",

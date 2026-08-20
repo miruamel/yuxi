@@ -2,6 +2,22 @@
 
 All notable changes to the Yuxi engine are recorded here. Entries group the
 tracked history by capability; commit hashes reference `git log`.
+### Maintenance & Docs
+- `docs`: `yuxi --help` was stale — it omitted `--cache`, `--replay`,
+  `--record`, `--kb`, `--kb-max-lines`, `--expect`, and `--tasks`, all of which
+  were already implemented and parsed. Rewrote `printHelp` (now in
+  `core/config/config.zig`) to group flags by Mode / Backend / Task / Knowledge
+  / LLM I/O / Batch and print the authoritative surface. `README.md` and
+  `AGENTS.md` flag lists were updated to match and now point at `--help` as the
+  source of truth. This is a genuine docs defect, not cosmetics: a co-owner or
+  user running `--help` couldn't discover the real feature set.
+- `refactor`: `config.zig` moved into `core/config/config.zig` (its own nested
+  subtree) and gained `core/config/config_test.zig`, keeping `core/` at the
+  five-file ceiling while adding parse coverage. The test asserts backend
+  parsing, that off-by-default features stay off, `--kb-max-lines` defaults to
+  200 (bare) and parses N, and that `--help`/`missing-task` raise their error
+  paths (locking the help surface against future regressions). `build.zig`
+  module root + test list updated; call sites unchanged (module-name import).
 ### Features
 - `feat`: plan-quality critic gate. `engine.run` now reviews the orchestrator's
   decomposition *before* codegen (LAYER 2.5). `critic.reviewPlan` reuses the
