@@ -47,6 +47,25 @@ pub fn run(ctx: *types.Ctx, code: []const u8) !Verdict {
     ctx.record("critic: done");
     return v;
 }
+/// Review the orchestrator's decomposition BEFORE codegen. Reuses the LLM
+/// critic path (and its verdict parser) with a plan-specific prompt so a
+/// nonsense, duplicated, or off-task plan is rejected and the run fails fast
+/// instead of burning the self-correction budget. This is the plan-level
+/// analogue of the per-step gate in step.zig. The system prompt deliberately
+/// omits the word "critic" so test seams that distinguish the per-step code
+/// review by the "critic" system string don't intercept the plan review.
+pub fn reviewPlan(ctx: *types.Ctx, plan: []const u8) !Verdict {
+    const sys = "You are a plan reviewer. Given the task decomposition below, reply APPROVE or REJECT followed by a short reason. Reject empty, duplicated, or off-task plans.";
+    const user = try std.fmt.allocPrint(ctx.allocator, "Plan:\n{s}", .{plan});
+    defer ctx.allocator.free(user);
+    const resp = try transport.complete(ctx.allocator, ctx.io, ctx, sys, user);
+    defer ctx.allocator.free(resp);
+    const v = try parseVerdict(ctx.allocator, resp);
+    ctx.log("[critic] plan verdict: {s}", .{if (v.ok) "APPROVE" else "REJECT"});
+    if (v.reason) |r| ctx.log("[critic] plan reason: {s}", .{r});
+    ctx.record("critic: plan reviewed");
+    return v;
+}
 
 /// Parse a critic response into a verdict. The first token decides; any
 /// following tokens form the (owned) reason. Ambiguous text defaults to APPROVE.

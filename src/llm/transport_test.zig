@@ -45,10 +45,10 @@ test "engine.run drives the real openai backend offline via --replay" {
     const replay_path = "/tmp/yuxi_replay_e2e.md";
     try fs.ensureDir(allocator, workdir);
 
-    // 7 recorded entries in the engine's exact call order: decomposer, then per
-    // step (builder, critic) x3. Authoring matches the real call sequence
-    // (orchestrator -> builder -> critic per step), so replay replaces the
-    // network without changing engine behavior.
+    // 8 recorded entries in the engine's exact call order: decomposer, plan
+    // review, then per step (builder, critic) x3. Authoring matches the real
+    // call sequence (orchestrator -> plan critic -> builder -> critic per
+    // step), so replay replaces the network without changing engine behavior.
     const file = try std.Io.Dir.createFile(std.Io.Dir.cwd(), io, replay_path, .{});
     defer file.close(io);
     var buf: [8192]u8 = undefined;
@@ -57,6 +57,8 @@ test "engine.run drives the real openai backend offline via --replay" {
         \\STEP: design the function signature
         \\STEP: implement the body
         \\STEP: add a unit test
+        \\---
+        \\APPROVE
         \\---
         \\pub fn step0() void {
         \\    const a: i32 = 2;
