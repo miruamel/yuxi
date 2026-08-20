@@ -18,10 +18,13 @@ pub fn run(ctx: *types.Ctx, task: []const u8) !?[]const u8 {
         return null;
     }
 
-    // Sanitizer / PII redaction (naive '@' redaction). Owning the redacted copy
-    // here and returning it (instead of discarding it) is the whole point: the
+    // Sanitizer / PII redaction. The earlier version only replaced the '@'
+    // glyph and swallowed the rest of the @-run, so "user@corp.com" leaked as
+    // "user<redacted>corp.com" — the domain stayed visible. Redact the WHOLE
+    // token containing '@' instead (email/ handle disappears entirely).
+    // Owning the redacted copy and returning it is the whole point: the
     // downstream orchestrator and the knowledge ledger must operate on the
-    // *sanitized* task, or the PII filter is a no-op that only logs byte counts.
+    // *sanitized* task, or the PII filter is a no-op.
     const clean = try redact(ctx.allocator, task);
     ctx.log("[gateway] sanitizer: {d} -> {d} bytes", .{ task.len, clean.len });
 
@@ -29,16 +32,24 @@ pub fn run(ctx: *types.Ctx, task: []const u8) !?[]const u8 {
     return clean;
 }
 
+/// Redact PII from `s`. Any whitespace-delimited token containing '@' (an
+/// email address or handle) is replaced wholesale with `<redacted>`; other
+/// tokens pass through unchanged. Over-redaction is preferred to under-
+/// redaction at a trust boundary — a benign token with '@' in it is hidden
+/// rather than risk leaking an address. Whitespace runs collapse to single
+/// spaces, which is acceptable for a sanitized task string.
 fn redact(allocator: std.mem.Allocator, s: []const u8) ![]u8 {
     var out = try std.ArrayList(u8).initCapacity(allocator, 0);
-    var i: usize = 0;
-    while (i < s.len) : (i += 1) {
-        if (s[i] == '@') {
+    var it = std.mem.tokenizeAny(u8, s, " \t\r\n");
+    var first = true;
+    while (it.next()) |tok| {
+        if (!first) try out.append(allocator, ' ');
+        first = false;
+        if (std.mem.indexOf(u8, tok, "@") != null) {
             try out.appendSlice(allocator, "<redacted>");
-            while (i < s.len and s[i] != ' ' and s[i] != '\n') : (i += 1) {}
-            continue;
+        } else {
+            try out.appendSlice(allocator, tok);
         }
-        try out.append(allocator, s[i]);
     }
     return out.toOwnedSlice(allocator);
 }

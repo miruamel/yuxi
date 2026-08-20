@@ -77,11 +77,27 @@ workdir repo is created.
 - **Cleanup:** after a successful deploy, per-step `gen_{i}.zig` fragments are
   deleted (best-effort) so only `gen_final.zig` remains in `ctx.workdir`.
 - **Gateway sanitizer is live (not a no-op):** `gateway.run` returns the
-  *redacted* task (`@`-run -> `<redacted>`) on admission; `engine.run` uses
-  that sanitized slice for `orchestrator.run` and `knowledge.recordLesson`
-  (and frees it), so codegen and the KB ledger operate on PII-scrubbed text.
-  Denial (short task / empty `AE_TOKEN`) returns `null` and nothing runs.
-  Don't regress by feeding the raw `task` to the orchestrator again.
+  *redacted* task on admission; `engine.run` uses that sanitized slice for
+  `orchestrator.run` and `knowledge.recordLesson` (and frees it), so codegen
+  and the KB ledger operate on PII-scrubbed text. Denial (short task / empty
+  `AE_TOKEN`) returns `null` and nothing runs. Don't regress by feeding the
+  raw `task` to the orchestrator again.
+- **Redactor hardens email leakage:** the earlier `redact` only replaced `@`
+  and swallowed the rest of the @-run, so `user@corp.com` leaked as
+  `user<redacted>corp.com` — the domain stayed visible. `redact` now replaces
+  the WHOLE whitespace token containing `@` (`user@corp.com` -> `<redacted>`),
+  preferring over-redaction at the trust boundary. `gateway_test.zig` covers
+  admission, whole-email redaction, and the no-PII passthrough.
+
+## AI review bot (co-owner signal)
+`Kilo Code Review` runs as a required-ish check on every PR (shows as a
+check named "Kilo Code Review"). Treat its verdict as a co-owner review: read
+`gh api pulls/<n>/reviews` + `/comments` + `issues/<n>/comments` after the
+check flips to `completed`, and act on any CRITICAL/WARNING before merge (a
+SUGGESTION is judgment-call). PR #6 came back `No Issues Found | Merge`. Don't
+merge past a bot-flagged CRITICAL without addressing it (or a documented
+reason). The bot may take a few minutes after CI — don't block the
+whole loop on it, but do consume its result.
 
 ## Self-correction (feat)
 The engine retries the build+compose+evaluate pipeline up to 3 times when
@@ -255,7 +271,8 @@ never a bare `ctx.allocator.free(e)` that leaves a dangling pointer for a later
 - `c91df1e` refactor+feat: extract `engine.compose` → `src/core/compose.zig` (§8 SLOC cap) + close monitoring→knowledge health loop (`knowledge.recordHealth`); PR #4 / issue #3 closed.
 - `3284de8` fix(evaluator): resolve `zig` exe path portably (`/opt/zig/zig` else `zig` on PATH) — was green locally, `FileNotFound` only in CI.
 - `b66179d` feat(kb): `--tasks` batch runs persist aggregate health summary to KB via `knowledge.recordBatch` (closes the batch-learning loop; §12); PR #5.
-- `HEAD` fix(gateway): sanitizer was a silent no-op — `gateway.run` redacted the task then discarded it, so orchestrator + KB ran on raw text. Now returns the owned redacted slice; `engine.run` uses it downstream. Closes stale issue #1 (rate-limit removal). New `gateway_test.zig`.
+- `19c1bde` fix(gateway): sanitizer was a silent no-op — `gateway.run` redacted the task then discarded it, so orchestrator + KB ran on raw text. Now returns the owned redacted slice; `engine.run` uses it downstream. New `gateway_test.zig`. Kilo Code Review: No Issues Found | Merge. PR #6.
+- `HEAD` fix(security): redactor leaked email domains — `redact` only replaced `@` so `user@corp.com` became `user<redacted>corp.com`. Now redacts the whole @-token (`user@corp.com` -> `<redacted>`); over-redaction at trust boundary. Gateway tests cover admission + whole-email + no-PII passthrough.
 
 ## Open questions (for the co-owner, not silently built)
 - `--dry-run` / plan mode (Product-shaping fork; needs co-owner call): what
