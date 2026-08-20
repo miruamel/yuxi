@@ -119,6 +119,24 @@ pub fn recordHealth(ctx: *types.Ctx, verdict: []const u8) !void {
     }
 }
 
+/// Persist the `--tasks` batch autonomy-health summary to the configured KB
+/// when one is set. Unlike the per-run `recordLesson`/`recordHealth` (one line
+/// per engine.run cycle, written by each task's own ctx.kb_path inside
+/// engine.run), this captures the *aggregate* shape of a multi-task run —
+/// total deploys and how many of the batch's tasks ended unhealthy — so a
+/// future run's `injectPrompt` can also steer away from an *unhealthy batch
+/// shape* (e.g. every task mock-fell-back, or none deployed), not only from a
+/// single cycle's verdict. No-op when no KB is configured, or when `summary`
+/// is empty (an empty batch has nothing to learn).
+pub fn recordBatch(alloc: std.mem.Allocator, kb_path: ?[]const u8, summary: []const u8) !void {
+    if (kb_path) |kb| {
+        if (summary.len == 0) return;
+        const lesson = try std.fmt.allocPrint(alloc, "- batch: {s}", .{summary});
+        defer alloc.free(lesson);
+        try save(alloc, kb, lesson);
+    }
+}
+
 /// Build the decomposition user-prompt, prepending prior lessons from the
 /// configured knowledge base when present. Caller owns the returned string.
 pub fn injectPrompt(ctx: *types.Ctx, task: []const u8) ![]const u8 {

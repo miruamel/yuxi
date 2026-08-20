@@ -125,6 +125,13 @@ numeric `critic_rej=N` counter that `recordLesson` records.
   run's `injectPrompt` also steers away from an *unhealthy cycle shape*
   (mock-dominated, budget-exhausted) — not only from a fixed failure or a
   rejected step. A healthy cycle produces no health lesson.
+- **Batch summary loop (feat):** `--tasks` runs already aggregated a per-batch
+  autonomy-health report in `loop.runTasks`, but only *logged* it. `loop` now
+  persists that aggregate via `knowledge.recordBatch` (tasks + total deploys +
+  unhealthy count) to the configured KB, so `injectPrompt` also learns *batch
+  shape* (e.g. every task mock-fell-back, none deployed) — not only the
+  per-run `recordLesson`/`recordHealth` lines each `engine.run` already writes.
+  No-op when `--kb` is unset or the batch is empty.
 
 ## Run metrics (observability, feat)
 `Ctx` carries five autonomy-health counters incremented at their event
@@ -240,6 +247,9 @@ never a bare `ctx.allocator.free(e)` that leaves a dangling pointer for a later
 - `9b58ab0` ci: fixed broken `goto-bus/setup-zig` → `mlugg/setup-zig@v2`.
 - `93b7e97` feat: injectable LLM backend seam (`Ctx.llm_fn`) + self-correction loop test.
 - `6ed8f54` feat: behavioral verification (`--expect`) with file-captured output.
+- `c91df1e` refactor+feat: extract `engine.compose` → `src/core/compose.zig` (§8 SLOC cap) + close monitoring→knowledge health loop (`knowledge.recordHealth`); PR #4 / issue #3 closed.
+- `3284de8` fix(evaluator): resolve `zig` exe path portably (`/opt/zig/zig` else `zig` on PATH) — was green locally, `FileNotFound` only in CI.
+- `HEAD` feat(kb): `--tasks` batch runs persist aggregate health summary to KB via `knowledge.recordBatch` (closes the batch-learning loop; §12).
 
 ## Open questions (for the co-owner, not silently built)
 - `--dry-run` / plan mode (Product-shaping fork; needs co-owner call): what
