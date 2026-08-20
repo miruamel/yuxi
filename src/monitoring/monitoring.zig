@@ -5,7 +5,7 @@ const types = @import("types");
 /// log, so the loop can read its own effectiveness at a glance. Purely
 /// diagnostic — never alters the pipeline.
 pub fn report(ctx: *types.Ctx) void {
-    ctx.log("[monitoring] metrics deploys={d} retries={d} critic_rejections={d} mock_fallbacks={d} token_budgets_exceeded={d} tokens={d}", .{ ctx.deploys, ctx.retries, ctx.critic_rejections, ctx.mock_fallbacks, ctx.token_budgets_exceeded, ctx.tokens });
+    ctx.log("[monitoring] metrics deploys={d} retries={d} critic_rejections={d} mock_fallbacks={d} network_retries={d} token_budgets_exceeded={d} tokens={d}", .{ ctx.deploys, ctx.retries, ctx.critic_rejections, ctx.mock_fallbacks, ctx.network_retries, ctx.token_budgets_exceeded, ctx.tokens });
     ctx.record("monitoring: metrics logged");
 }
 

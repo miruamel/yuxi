@@ -66,6 +66,7 @@ pub const Ctx = struct {
     retries: usize,
     deploys: usize,
     token_budgets_exceeded: usize,
+    network_retries: usize,
     events: std.ArrayList([]const u8),
 
     pub fn init(allocator: std.mem.Allocator, io: std.Io, environ: std.process.Environ, mode: Mode, backend: LlmBackend, key: ?[]const u8, base: []const u8, workdir: []const u8) !Ctx {
@@ -88,6 +89,7 @@ pub const Ctx = struct {
             .retries = 0,
             .deploys = 0,
             .token_budgets_exceeded = 0,
+            .network_retries = 0,
             .expected = null,
             .llm_fn = null,
             .recorded = try std.ArrayList([]const u8).initCapacity(allocator, 0),
