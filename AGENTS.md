@@ -216,6 +216,14 @@ so the loop can read its own effectiveness (critic reject rate, mock-fallback
 frequency, retry churn, deploy rate) without parsing event strings.
 `network_retries` is observability-only: a recovered transient network blip is
 NOT a degradation, so it never trips `assessHealth` (unlike `mock_fallbacks`).
+`llm/http.zig` is the only network path and the only place that shells out
+(via `std.process.run`). It invokes `curl` with **array argv** (never a shell),
+so `url`/`body`/`key` are passed positionally and cannot inject shell
+commands — do NOT "simplify" this to a `sh -c`/string-command invocation.
+`jsonEscape` escapes the full RFC 8259 control range (U+0000–U+001F) because
+the prompt path carries semi-trusted input (KB lessons, recorded evaluator
+errors, task text) that can contain raw control bytes; an unescaped one
+yields malformed JSON → server rejection → silent mock fallback.
 
 ## Smoke test & gotchas
 End-to-end check, offline (no API key):

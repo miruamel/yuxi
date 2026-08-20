@@ -47,6 +47,21 @@ tracked history by capability; commit hashes reference `git log`.
   fallbacks, letting a mock-dominated cycle slip past the health check. The
   fallback path now increments `ctx.mock_fallbacks`, so the signal fires
   regardless of where the fallback originated. New `src/builder/builder_test.zig`
+- `fix`: `http.jsonEscape` now escapes the full RFC 8259 control range
+  (U+0000–U+001F), not just `"`, `\`, `\n`, `\r`, `\t`. The prompt path
+  carries semi-trusted input — KB lessons, recorded evaluator errors, and task
+  text — which can contain raw control bytes (notably ESC `0x1B`, form-feed,
+  vertical tab from terminal/compiler output). A raw control char previously
+  leaked unescaped into the `-d` JSON body, producing malformed JSON; the
+  endpoint rejected it (`-f` → empty body → `error.RequestFailed`), and the
+  bounded retry in PR #13 then fell through to `resilience.fallback` — a silent
+  mock degradation triggered by *input content*, not a real network fault.
+  Control chars now encode as `\u00XX`. `extractContent` already decoded `\b`
+  and `\f` on the way back, so this also makes the encode/decode pair
+  consistent. New regression test asserts a raw ESC + vertical tab escapes to
+  `\u001B`/`\u000B`. Also documented in AGENTS.md: `llm/http.zig` shells out to
+  `curl` via **array argv** (no shell), so the header/url/body are not subject
+  to shell injection.
 - `refactor`: `monitoring.assessHealth` is now the single source of truth for
   cycle health. It returns `HealthVerdict { verdict, healthy }` (caller-owned
   verdict). `loop.runTasks` previously computed its own `healthy` as
