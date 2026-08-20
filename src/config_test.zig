@@ -71,3 +71,13 @@ test "config --version and -V are reachable and exit-zero info paths" {
     const vshort = [_][]const u8{ "./yuxi", "-V" };
     try std.testing.expectError(error.VersionRequested, parseArgs(std.testing.allocator, io, &vshort));
 }
+
+test "config --tasks is parsed into the batch path" {
+    const io = testIo();
+    // --tasks must be parsed into the batch path, not silently ignored. The
+    // help text (printHelp) is the authoritative flag list and also gains a
+    // --tasks entry in this change; this guards the parse side of that contract.
+    const argv = [_][]const u8{ "./yuxi", "--tasks", "plan.txt", "--mock" };
+    const cfg = try parseArgs(std.testing.allocator, io, &argv);
+    try std.testing.expectEqualStrings("plan.txt", cfg.tasks.?);
+}

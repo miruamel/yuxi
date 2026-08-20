@@ -18,13 +18,22 @@ runs fully offline for development and testing.
 ```
 
 Flags: `--mock|--openai|--local`, `--hitl|--no-hitl`, `--task TEXT`,
-`--out DIR`, `--expect TEXT`, `--max-tokens N`, `--cache[=DIR]`,
-`--replay[=FILE]`, `--record[=FILE]`, `--kb[=DIR]`, `--kb-max-lines[=N]`,
-`--tasks FILE`. `yuxi --help` prints the authoritative, always-current list.
+`--tasks FILE` (multi-step plan, one task per line), `--out DIR`,
+`--expect TEXT`, `--max-tokens N`, `--cache[=DIR]`, `--replay[=FILE]`,
+`--record[=FILE]`, `--kb[=DIR]`, `--kb-max-lines[=N]`, `--report[=FILE]`,
+`--health-hook CMD` (spawn `CMD <report>` after an unhealthy run, or always
+with `--always-hook`), `-V/--version` (print `yuxi <tag>` + exit 0).
+`yuxi --help` prints the authoritative, always-current list.
 Environment: `OPENAI_API_KEY` / `OPENAI_BASE`, `LOCAL_BASE`,
 `AE_TOKEN` (optional gateway auth token). The OpenAI/local backend shells out
-to `curl` (array argv, no shell) with bounded retry + timeouts — see
-`src/llm/http.zig`.
+to `curl` (array argv, no shell) with bounded retry + timeouts — the bearer
+token is written to a `0600` temp config and passed via `-K`, never into
+argv, so the LLM secret is not world-readable via the process table (CWE-214).
+`--report` emits a machine-consumable JSON health report (single `TaskResult`
+or a `tasks[]` array + `batch_healthy`) carrying the autonomy-health verdict
+and the engine `version`; `--health-hook` lets an external gate (CI, a
+co-owner deploy policy) act on that verdict without the engine implementing
+the gate itself. See `AGENTS.md` for the full observability surface.
 
 ## Pipeline
 
