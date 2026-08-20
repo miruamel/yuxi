@@ -3,6 +3,7 @@ const types = @import("types");
 const config = @import("config");
 const engine = @import("engine");
 const knowledge = @import("knowledge");
+const monitoring = @import("monitoring");
 
 pub const TaskResult = struct {
     task: []const u8,
@@ -37,7 +38,6 @@ pub fn runTasks(allocator: std.mem.Allocator, io: std.Io, environ: std.process.E
         if (line.len == 0 or line[0] == '#') continue;
         idx += 1;
         const wd = try std.fmt.allocPrint(allocator, "{s}/{d}", .{ cfg.workdir, idx });
-        defer allocator.free(wd);
         var ctx = engine.newCtx(allocator, io, environ, cfg, wd) catch |e| {
             types.logLine(io, "[loop] task {d} ctx build failed: {s}", .{ idx, @errorName(e) });
             continue;
@@ -45,7 +45,10 @@ pub fn runTasks(allocator: std.mem.Allocator, io: std.Io, environ: std.process.E
         engine.run(allocator, io, &ctx, line) catch |e| {
             types.logLine(io, "[loop] task {d} ({s}) failed: {s}", .{ idx, line, @errorName(e) });
         };
-        const healthy = ctx.deploys > 0 and ctx.token_budgets_exceeded == 0;
+        // Health comes from the single source of truth (monitoring.assessHealth)
+        // so the batch verdict can never contradict the per-cycle verdict the
+        // engine persisted to the KB. The loop must not re-derive "healthy".
+        const hv = try monitoring.assessHealth(&ctx);
         try results.append(allocator, .{
             .task = try allocator.dupe(u8, line),
             .deploys = ctx.deploys,
@@ -53,27 +56,25 @@ pub fn runTasks(allocator: std.mem.Allocator, io: std.Io, environ: std.process.E
             .critic_rejections = ctx.critic_rejections,
             .mock_fallbacks = ctx.mock_fallbacks,
             .token_budgets_exceeded = ctx.token_budgets_exceeded,
-            .healthy = healthy,
+            .healthy = hv.healthy,
         });
+        types.logLine(io, "[loop] {s} -> deploys={d} retries={d} critic_rej={d} mock_fb={d} budget_ex={d} health={s} verdict=\"{s}\"", .{
+            line,                                  ctx.deploys, ctx.retries, ctx.critic_rejections, ctx.mock_fallbacks, ctx.token_budgets_exceeded,
+            if (hv.healthy) "OK" else "UNHEALTHY", hv.verdict,
+        });
+        if (hv.verdict.len > 0) allocator.free(hv.verdict);
     }
-
-    types.logLine(io, "[loop] === batch report: {d} task(s) ===", .{results.items.len});
+    var total_unhealthy: usize = 0;
     for (results.items) |r| {
-        types.logLine(io, "[loop] {s} -> deploys={d} retries={d} critic_rej={d} mock_fb={d} budget_ex={d} health={s}", .{
-            r.task,                               r.deploys, r.retries, r.critic_rejections, r.mock_fallbacks, r.token_budgets_exceeded,
-            if (r.healthy) "OK" else "UNHEALTHY",
-        });
+        if (!r.healthy) total_unhealthy += 1;
     }
+    types.logLine(io, "[loop] === batch summary: {d} task(s), {d} unhealthy ===", .{ results.items.len, total_unhealthy });
 
     // Persist the aggregate batch autonomy-health summary to the KB so the
     // next cycle's injectPrompt learns batch shape, not only per-run verdicts.
     if (cfg.kb_path) |kb| {
         var total_deploys: usize = 0;
-        var total_unhealthy: usize = 0;
-        for (results.items) |r| {
-            total_deploys += r.deploys;
-            if (!r.healthy) total_unhealthy += 1;
-        }
+        for (results.items) |r| total_deploys += r.deploys;
         const summary = try std.fmt.allocPrint(allocator, "tasks={d} deploys={d} unhealthy={d}", .{ results.items.len, total_deploys, total_unhealthy });
         defer allocator.free(summary);
         knowledge.recordBatch(allocator, kb, summary) catch |e| types.logLine(io, "[loop] batch kb save failed: {s}", .{@errorName(e)});
