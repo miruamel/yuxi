@@ -112,7 +112,7 @@ test "engine.run records a replay-compatible transcript (mock capture -> offline
     ctx1.record_path = rec_path;
     try engine.run(allocator, io, &ctx1, "design a calculator");
     try std.testing.expect(ctx1.deploys >= 1);
-    try std.testing.expect(engine.fileExists(rec_path));
+    try std.testing.expect(fs.fileExists(rec_path));
 
     var ctx2 = try types.Ctx.init(allocator, io, .empty, .no_hitl, .openai, null, "", workdir);
     ctx2.replay_path = rec_path;

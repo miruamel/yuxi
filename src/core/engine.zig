@@ -25,14 +25,14 @@ pub fn run(allocator: std.mem.Allocator, io: std.Io, ctx: *types.Ctx, task: []co
     // the raw input. Denied -> null, nothing runs.
     const safe_task = (try gateway.run(ctx, task)) orelse {
         ctx.log("[engine] ABORT at gateway", .{});
-        return;
+        return finishRun(ctx, false, 0, task);
     };
     defer allocator.free(safe_task);
     // LAYER 2: Orchestrator
     var steps = try std.ArrayList(types.Step).initCapacity(allocator, 0);
     if (!try orchestrator.run(ctx, safe_task, &steps)) {
         ctx.log("[engine] ABORT at orchestrator", .{});
-        return;
+        return finishRun(ctx, false, 0, safe_task);
     }
     // LAYER 2.5: Plan-quality gate. Review the decomposition before committing
     // to codegen; a bad plan fails fast instead of burning the self-correction
@@ -50,7 +50,7 @@ pub fn run(allocator: std.mem.Allocator, io: std.Io, ctx: *types.Ctx, task: []co
             knowledge.recordCritic(ctx, "plan", pv.reason orelse "no reason") catch |e| ctx.log("[knowledge] plan lesson failed: {s}", .{@errorName(e)});
             if (pv.reason) |r| allocator.free(r);
             ctx.log("[engine] ABORT at plan critic", .{});
-            return;
+            return finishRun(ctx, false, steps.items.len, safe_task);
         }
         if (pv.reason) |r| allocator.free(r);
     }
@@ -117,6 +117,19 @@ pub fn run(allocator: std.mem.Allocator, io: std.Io, ctx: *types.Ctx, task: []co
     for (fragments.items) |f| allocator.free(f);
     fragments.deinit(allocator);
 
+    return finishRun(ctx, verified, steps.items.len, safe_task);
+}
+
+/// LAYER 7-9 tail: resilience summary, knowledge ledger (outcome lesson +
+/// persisted health verdict), and monitoring metrics. Runs on EVERY exit path
+/// — including the early aborts at the gateway, orchestrator, and plan critic —
+/// so a rejected plan still records its outcome (critic_rej=N), the health
+/// verdict, and the metrics. This keeps the learning loop closed for that class
+/// of failure: without it, a plan-level rejection skipped recordLesson (the
+/// numeric critic_rej counter was lost from the ledger) and assessHealth
+/// (no health verdict persisted), so the next cycle's injectPrompt never saw
+/// a plan-shaped failure to steer away from.
+fn finishRun(ctx: *types.Ctx, verified: bool, steps_len: usize, task_label: []const u8) !void {
     // LAYER 7: Resilience summary
     resilience.summary(ctx);
     // LAYER 8: Knowledge
@@ -126,7 +139,7 @@ pub fn run(allocator: std.mem.Allocator, io: std.Io, ctx: *types.Ctx, task: []co
         knowledge.log(ctx, "task pipeline finished; nothing deployed");
     }
     if (ctx.kb_path) |_| {
-        knowledge.recordLesson(ctx, safe_task, steps.items.len) catch |e| ctx.log("[knowledge] save failed: {s}", .{@errorName(e)});
+        knowledge.recordLesson(ctx, task_label, steps_len) catch |e| ctx.log("[knowledge] save failed: {s}", .{@errorName(e)});
     }
     // LAYER 9: Monitoring — collect the autonomy-health verdict, then persist
     // it to the KB so the next cycle's injectPrompt can steer away from the
@@ -136,7 +149,7 @@ pub fn run(allocator: std.mem.Allocator, io: std.Io, ctx: *types.Ctx, task: []co
     if (ctx.kb_path) |_| {
         knowledge.recordHealth(ctx, verdict) catch |e| ctx.log("[knowledge] health save failed: {s}", .{@errorName(e)});
     }
-    types.logLine(io, "[engine] done. events={d}", .{ctx.events.items.len});
+    types.logLine(ctx.io, "[engine] done. events={d}", .{ctx.events.items.len});
 }
 
 /// Flush captured LLM responses (Ctx.recorded) to Ctx.record_path as a
@@ -181,16 +194,4 @@ pub fn newCtx(allocator: std.mem.Allocator, io: std.Io, environ: std.process.Env
     ctx.replay_path = cfg.replay_path;
     ctx.record_path = cfg.record_path;
     return ctx;
-}
-
-/// Returns true if `path` exists (regardless of whether it is readable).
-/// Used by tests to assert deployment artifacts landed (and intermediates
-/// were cleaned up).
-pub fn fileExists(path: []const u8) bool {
-    const fd = std.posix.openat(std.posix.AT.FDCWD, path, std.posix.O{ .ACCMODE = .RDONLY }, 0) catch |e| {
-        if (e == error.FileNotFound) return false;
-        return true;
-    };
-    _ = std.os.linux.close(fd);
-    return true;
 }

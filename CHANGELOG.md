@@ -11,7 +11,18 @@ tracked history by capability; commit hashes reference `git log`.
   or deploy. Always-on, fail-fast, non-breaking — the default backend returns
   APPROVE. New `src/core/selfcorr/plan_gate_test.zig` exercises the reject
   path end-to-end via the `Ctx.llm_fn` seam. Resolves §14 feature-bias drift
-  after five consecutive non-feature cycles.
+- `fix`: plan-reject no longer truncates the learning loop. The LAYER 2.5
+  plan critic gate in `engine.run` aborted with a bare `return`, skipping
+  LAYER 7-9 (resilience summary, `knowledge.recordLesson` with `critic_rej=N`,
+  `monitoring.report` + `recordHealth`). A rejected plan therefore never wrote
+  its numeric critic-rejection counter to the KB ledger and never persisted a
+  health verdict, so the next cycle's `injectPrompt` couldn't steer away from a
+  plan-shaped failure — contradicting the gate's own purpose. The four early
+  aborts (gateway, orchestrator, plan critic, no-verify) now tail-call a new
+  `finishRun` helper that runs LAYER 7-9, so every exit path records outcome +
+  health. `engine.fileExists` moved to `util/fs.zig` to keep `engine.zig` under
+  the 200-SLOC invariant (§8); tests now call `fs.fileExists`.
+
 
 ### Engineering / observability
 - `refactor`: removed dead code in `src/gateway/gateway.zig` — the no-op
