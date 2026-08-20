@@ -2,6 +2,19 @@ const std = @import("std");
 const types = @import("types");
 const fs = @import("fs");
 
+/// Resolve the `zig` executable path. The local dev box installs zig at
+/// `/opt/zig/zig`; CI (mlugg/setup-zig) puts `zig` on `PATH` instead. Prefer the
+/// absolute path when present and fall back to a bare `zig` (resolved via the
+/// child's `PATH`) so the evaluator spawns the compiler in both environments.
+fn zigExe(allocator: std.mem.Allocator) ![]const u8 {
+    const io = std.Io.Threaded.global_single_threaded.io();
+    if (std.Io.Dir.accessAbsolute(io, "/opt/zig/zig", .{})) |_| {
+        return allocator.dupe(u8, "/opt/zig/zig");
+    } else |_| {
+        return allocator.dupe(u8, "zig");
+    }
+}
+
 pub fn run(ctx: *types.Ctx, path: []const u8) !bool {
     ctx.log("[evaluator] compile+run: {s}", .{path});
 
@@ -13,9 +26,11 @@ pub fn run(ctx: *types.Ctx, path: []const u8) !bool {
     // Compile the generated artifact into a real executable. Output is captured
     // to a file (not piped) so behavioral verification and self-correction
     // feedback always observe the real compiler/run text.
+    const zig_exe = try zigExe(ctx.allocator);
+    defer ctx.allocator.free(zig_exe);
     const emit_arg = try std.fmt.allocPrint(ctx.allocator, "-femit-bin={s}", .{bin_path});
     defer ctx.allocator.free(emit_arg);
-    const compile_argv = [_][]const u8{ "/opt/zig/zig", "build-exe", path, emit_arg };
+    const compile_argv = [_][]const u8{ zig_exe, "build-exe", path, emit_arg };
     const compiled = switch (try runTo(ctx, &compile_argv, out_path)) {
         .exited => |code| code == 0,
         else => false,
