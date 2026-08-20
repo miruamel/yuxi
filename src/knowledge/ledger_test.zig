@@ -13,8 +13,9 @@ test "knowledge recordLesson writes an enriched per-run lesson" {
     ctx.kb_path = path;
     ctx.deploys = 1;
     ctx.critic_rejections = 2;
-    ctx.mock_fallbacks = 1;
     ctx.token_budgets_exceeded = 0;
+    ctx.mock_fallbacks = 1;
+    ctx.max_steps_exceeded = 1;
     try knowledge.recordLesson(&ctx, "add a feature", 3);
     const got = (try knowledge.load(alloc, path)).?;
     defer alloc.free(got);
@@ -22,6 +23,9 @@ test "knowledge recordLesson writes an enriched per-run lesson" {
     try std.testing.expect(std.mem.indexOf(u8, got, "steps=3") != null);
     try std.testing.expect(std.mem.indexOf(u8, got, "critic_rej=2") != null);
     try std.testing.expect(std.mem.indexOf(u8, got, "mock_fb=1") != null);
+    // The max-steps cap hit is a distinct degradation counter (PR #27); it must
+    // surface in the ledger so future runs learn from an aborted decomposition.
+    try std.testing.expect(std.mem.indexOf(u8, got, "max_steps_ex=1") != null);
 }
 
 test "knowledge recordLesson appends the eval error on a failed run" {

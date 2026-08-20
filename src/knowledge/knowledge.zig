@@ -46,12 +46,12 @@ pub fn save(alloc: std.mem.Allocator, path: []const u8, lesson: []const u8) !voi
 
 /// Persist a per-run lesson to the configured knowledge base; no-op when none
 /// is set. The lesson captures outcome plus the degradation counters (critic
-/// rejections, mock fallbacks, token-budget breaches) so a later run that
-/// replays prior lessons via `injectPrompt` sees *how* a prior cycle went, not
-/// just whether it deployed. On a failed run with a captured evaluator error,
-/// the trimmed error is appended (see `errSnippet`) so the next run also learns
-/// *why* it failed — closing the learning loop for non-critic failures too,
-/// not only for critic rejections (`recordCritic`).
+/// rejections, mock fallbacks, token-budget breaches, and max-steps cap hits)
+/// so a later run that replays prior lessons via `injectPrompt` sees *how* a
+/// prior cycle went, not just whether it deployed. On a failed run with a
+/// captured evaluator error, the trimmed error is appended (see `errSnippet`)
+/// so the next run also learns *why* it failed — closing the learning loop for
+/// non-critic failures too, not only for critic rejections (`recordCritic`).
 pub fn recordLesson(ctx: *types.Ctx, task: []const u8, steps: usize) !void {
     if (ctx.kb_path) |kb| {
         const outcome = if (ctx.deploys > 0) "deployed" else "failed";
@@ -60,14 +60,14 @@ pub fn recordLesson(ctx: *types.Ctx, task: []const u8, steps: usize) !void {
         const lesson = if (err) |e|
             try std.fmt.allocPrint(
                 ctx.allocator,
-                "- {s}: {s} (steps={d} deploys={d} retries={d} critic_rej={d} mock_fb={d} budget_ex={d}) error=\"{s}\"",
-                .{ task, outcome, steps, ctx.deploys, ctx.retries, ctx.critic_rejections, ctx.mock_fallbacks, ctx.token_budgets_exceeded, e },
+                "- {s}: {s} (steps={d} deploys={d} retries={d} critic_rej={d} mock_fb={d} budget_ex={d} max_steps_ex={d}) error=\"{s}\"",
+                .{ task, outcome, steps, ctx.deploys, ctx.retries, ctx.critic_rejections, ctx.mock_fallbacks, ctx.token_budgets_exceeded, ctx.max_steps_exceeded, e },
             )
         else
             try std.fmt.allocPrint(
                 ctx.allocator,
-                "- {s}: {s} (steps={d} deploys={d} retries={d} critic_rej={d} mock_fb={d} budget_ex={d})",
-                .{ task, outcome, steps, ctx.deploys, ctx.retries, ctx.critic_rejections, ctx.mock_fallbacks, ctx.token_budgets_exceeded },
+                "- {s}: {s} (steps={d} deploys={d} retries={d} critic_rej={d} mock_fb={d} budget_ex={d} max_steps_ex={d})",
+                .{ task, outcome, steps, ctx.deploys, ctx.retries, ctx.critic_rejections, ctx.mock_fallbacks, ctx.token_budgets_exceeded, ctx.max_steps_exceeded },
             );
         defer ctx.allocator.free(lesson);
         try save(ctx.allocator, kb, lesson);
