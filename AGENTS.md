@@ -76,7 +76,12 @@ because the spawned `git` inherits no identity in this env.
 workdir repo is created.
 - **Cleanup:** after a successful deploy, per-step `gen_{i}.zig` fragments are
   deleted (best-effort) so only `gen_final.zig` remains in `ctx.workdir`.
-  On evaluation failure the intermediates are kept for debugging.
+- **Gateway sanitizer is live (not a no-op):** `gateway.run` returns the
+  *redacted* task (`@`-run -> `<redacted>`) on admission; `engine.run` uses
+  that sanitized slice for `orchestrator.run` and `knowledge.recordLesson`
+  (and frees it), so codegen and the KB ledger operate on PII-scrubbed text.
+  Denial (short task / empty `AE_TOKEN`) returns `null` and nothing runs.
+  Don't regress by feeding the raw `task` to the orchestrator again.
 
 ## Self-correction (feat)
 The engine retries the build+compose+evaluate pipeline up to 3 times when
@@ -249,7 +254,8 @@ never a bare `ctx.allocator.free(e)` that leaves a dangling pointer for a later
 - `6ed8f54` feat: behavioral verification (`--expect`) with file-captured output.
 - `c91df1e` refactor+feat: extract `engine.compose` → `src/core/compose.zig` (§8 SLOC cap) + close monitoring→knowledge health loop (`knowledge.recordHealth`); PR #4 / issue #3 closed.
 - `3284de8` fix(evaluator): resolve `zig` exe path portably (`/opt/zig/zig` else `zig` on PATH) — was green locally, `FileNotFound` only in CI.
-- `HEAD` feat(kb): `--tasks` batch runs persist aggregate health summary to KB via `knowledge.recordBatch` (closes the batch-learning loop; §12).
+- `b66179d` feat(kb): `--tasks` batch runs persist aggregate health summary to KB via `knowledge.recordBatch` (closes the batch-learning loop; §12); PR #5.
+- `HEAD` fix(gateway): sanitizer was a silent no-op — `gateway.run` redacted the task then discarded it, so orchestrator + KB ran on raw text. Now returns the owned redacted slice; `engine.run` uses it downstream. Closes stale issue #1 (rate-limit removal). New `gateway_test.zig`.
 
 ## Open questions (for the co-owner, not silently built)
 - `--dry-run` / plan mode (Product-shaping fork; needs co-owner call): what
@@ -268,5 +274,9 @@ never a bare `ctx.allocator.free(e)` that leaves a dangling pointer for a later
   **Stakes:** gating eval behind a human breaks the autonomous loop and the §30
   runtime-feedback signal; gating only persistence keeps oversight at the
   irreversible boundary without throttling self-correction.
+
+Resolved (no longer open): issue #1 (gateway rate-limit no-op) — the dead
+per-call counter was removed in `dc7f217`; gateway now does auth + validation
++ PII redaction only. Closed as *remove* (option B).
 
 Tracked for co-owner decision: issue #2 (--dry-run plan scope; --hitl gating scope).

@@ -11,7 +11,13 @@ tracked history by capability; commit hashes reference `git log`.
 - `fix`: `engine.run` no longer logs `"task pipeline complete"` on paths that
   deploy nothing; the completion line now reflects the actual outcome
   (deployed vs not).
-
+- `fix`: `gateway.run` previously computed the PII-redacted task and then
+  discarded it (`defer free`, returned only `bool`) — so the sanitizer was a
+  silent no-op and the orchestrator + KB ledger ran on the *raw* task. It now
+  returns the owned redacted slice; `engine.run` uses it for `orchestrator.run`
+  and `knowledge.recordLesson` and frees it. Denial (short task / empty
+  `AE_TOKEN`) returns `null` and nothing runs. New `gateway_test.zig` covers
+  both the admission path and the redaction output.
 
 ### Knowledge base / batch learning loop
 - `feat`: `--tasks` batch runs now persist an aggregate autonomy-health
