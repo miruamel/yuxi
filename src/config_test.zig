@@ -59,3 +59,15 @@ test "config --help and missing task are reachable error paths" {
     const mock = [_][]const u8{ "./yuxi", "--mock" };
     try std.testing.expectError(error.MissingTask, parseArgs(std.testing.allocator, io, &mock));
 }
+
+test "config --version and -V are reachable and exit-zero info paths" {
+    const io = testIo();
+    // `--version` must signal VersionRequested so the (now always-current)
+    // version path is reachable from the CLI, not dead code. Same success
+    // contract as `--help` (exit 0); the actual version string is asserted
+    // against the built binary in the main test's smoke check.
+    const v = [_][]const u8{ "./yuxi", "--version" };
+    try std.testing.expectError(error.VersionRequested, parseArgs(std.testing.allocator, io, &v));
+    const vshort = [_][]const u8{ "./yuxi", "-V" };
+    try std.testing.expectError(error.VersionRequested, parseArgs(std.testing.allocator, io, &vshort));
+}

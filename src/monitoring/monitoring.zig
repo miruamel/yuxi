@@ -76,10 +76,21 @@ pub fn taskResult(alloc: std.mem.Allocator, task: []const u8, ctx: *types.Ctx, h
 /// set of results from a `--tasks` run (null otherwise). Exactly one is
 /// non-null. The report records `healthy` (all results healthy) so a consumer
 /// can gate purely on the JSON, independent of the process exit code.
-pub fn writeReport(allocator: std.mem.Allocator, io: std.Io, path: []const u8, single: ?TaskResult, batch: ?[]const TaskResult) !void {
+/// `version` is the build-time engine version (from `build_options`). It is
+/// emitted as a top-level `"version"` field on every report so an external
+/// gate comparing reports across deploys can tell which engine version
+/// produced each one — a release stamp that travels with the artifact.
+pub fn writeReport(allocator: std.mem.Allocator, io: std.Io, path: []const u8, version: []const u8, single: ?TaskResult, batch: ?[]const TaskResult) !void {
     _ = io;
     var buf = try std.ArrayList(u8).initCapacity(allocator, 256);
     defer buf.deinit(allocator);
+    try buf.appendSlice(allocator, "{\"version\":\"");
+    // The version is a build constant; escape defensively in case a future
+    // stamp ever contains a quote/backslash (current `git describe` output
+    // cannot, but the writer must stay valid JSON either way).
+    const esc_ver = escapeJson(allocator, version) catch "";
+    if (esc_ver.len > 0) try buf.appendSlice(allocator, esc_ver);
+    try buf.appendSlice(allocator, "\",");
     if (single) |s| {
         try appendResult(allocator, &buf, s);
     } else if (batch) |results| {
@@ -87,7 +98,7 @@ pub fn writeReport(allocator: std.mem.Allocator, io: std.Io, path: []const u8, s
         for (results) |r| {
             if (!r.healthy) all_healthy = false;
         }
-        try buf.appendSlice(allocator, "{\"batch_healthy\":");
+        try buf.appendSlice(allocator, "\"batch_healthy\":");
         try buf.appendSlice(allocator, if (all_healthy) "true" else "false");
         try buf.appendSlice(allocator, ",\"tasks\":[");
         for (results, 0..) |r, i| {

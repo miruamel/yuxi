@@ -86,3 +86,19 @@ test "main exits non-zero on a CLI parse error, zero on --help" {
     defer a.free(help.stderr);
     try std.testing.expect(help.term == .exited and help.term.exited == 0);
 }
+
+test "main --version prints the build stamp and exits zero" {
+    // The version comes from git describe at build time; a gate or operator
+    // can read `yuxi vX.Y.Z-...` from stdout. Assert the exact prefix so the
+    // contract (not just a non-empty line) is locked.
+    const a = std.heap.page_allocator;
+    var threaded = std.Io.Threaded.init(a, .{ .environ = std.Io.Threaded.global_single_threaded.environ.process_environ });
+    const bin = "zig-out/bin/yuxi";
+    const ver = try std.process.run(a, threaded.io(), .{ .argv = &[_][]const u8{ bin, "--version" } });
+    defer a.free(ver.stdout);
+    defer a.free(ver.stderr);
+    try std.testing.expect(ver.term == .exited and ver.term.exited == 0);
+    // stdout has a trailing newline from logLine; trim it before matching.
+    const out = std.mem.trim(u8, ver.stdout, "\r\n");
+    try std.testing.expect(std.mem.startsWith(u8, out, "yuxi v"));
+}

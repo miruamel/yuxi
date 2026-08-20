@@ -10,6 +10,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Fetch full history + tags so `git describe` (build-time version
+          # stamp, build.zig) resolves a real tag instead of an empty string.
+          fetch-depth: 0
+          fetch-tags: true
       - name: Setup Zig
         uses: mlugg/setup-zig@v2
         with:

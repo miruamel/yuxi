@@ -61,7 +61,28 @@ All notable changes to the Yuxi engine are recorded here. Entries group the
   exited 0, which contradicted the exit-code contract CI/cron gate on (#18/#19/
   #21). Now `--help` still exits 0 (a successful info request), but a genuine
   parse error (`MissingTask`) exits 1. `main_test` shells the built binary and
-  asserts both exit codes, so the regression is caught by `zig build test`.
+
+### Build-time version stamp + `--version` (feat, §12/§28 follow-on, PR #23)
+- The engine now carries its own version. `build.zig` detects it via
+  `git describe --tags --always --dirty` at build time and injects it into every
+  module through a `build_options.version` value (no `version` constant in
+  `src/`, keeping the tag-based versioning convention). `git` failures (e.g. a
+  hermetic tarball build) degrade to `""` rather than breaking the build.
+- New `--version`/`-V` flag prints `yuxi <version>` and exits 0, on the same
+  success contract as `--help`. `config` returns `error.VersionRequested`,
+  `main` treats it like `HelpRequested` (exit 0).
+- `monitoring.writeReport` now emits a top-level `"version"` envelope field on
+  every report (single and batch), so an external gate comparing reports across
+  deploys can tell which engine version produced each — a release stamp that
+  travels with the artifact. `main` passes the build-time version into the
+  report writer.
+- Tests: `config_test` proves `--version`/`-V` are reachable
+  (`VersionRequested`); `monitoring_test` asserts the `version` envelope field
+  for both single and batch; `main_test` shells the built binary and checks
+  `yuxi --version` prints the `yuxi v…` stamp and exits 0.
+- CI: `actions/checkout` now uses `fetch-depth: 0` + `fetch-tags: true` so the
+  version stamp resolves a real tag under GitHub Actions (default shallow
+  clones yielded an empty stamp).
 
 
 
