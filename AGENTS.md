@@ -115,6 +115,16 @@ workdir repo is created.
 - **`engine.fileExists` moved to `util/fs.zig`:** it's a pure filesystem
   predicate; keeping it in engine.zig pushed that file past the 200-SLOC
   invariant (§8). Tests now call `fs.fileExists`, not `engine.fileExists`.
+- **Builder fallback must count `mock_fallbacks` (fix):** `builder.run` calls
+  `resilience.fallback(ctx)` on a transport error but previously never
+  incremented `ctx.mock_fallbacks` — unlike the per-step critic fallback in
+  `step.zig`. So the autonomy-health signal (`assessHealth`'s "mock fallback
+  dominated" WARN) and `recordLesson`'s `mock_fb=N` under-counted builder-level
+  fallbacks, letting a mock-dominated cycle slip past the health check. The
+  fallback path now increments `ctx.mock_fallbacks` (matching `step.zig`), so
+  the signal fires regardless of where the fallback originated. `builder_test.zig`
+  covers the fail-then-succeed seam path.
+
 
 
 
@@ -306,7 +316,7 @@ never a bare `ctx.allocator.free(e)` that leaves a dangling pointer for a later
 - `HEAD` feat(core): plan-quality critic gate — review decomposition before codegen (LAYER 2.5); fail-fast on REJECT, persist plan lesson. New plan_gate_test.zig. Resolves §14 feature-bias drift (5 non-feature cycles).
 - `--dry-run` / plan mode (Product-shaping fork; needs co-owner call): what
   should it surface — the decomposed `STEP:` plan only, the critic verdict on
-  the first generated artifact, or the full eval result? **My lean: plan +
+- `HEAD` fix(builder): builder.run now increments `ctx.mock_fallbacks` on a transport-error fallback, matching `step.zig`; previously the autonomy-health signal ("mock fallback dominated") and `recordLesson`'s `mock_fb` under-counted builder-level fallbacks. Added `src/builder/builder_test.zig` (fail-then-succeed seam). Registered it in `build.zig` test_files.
   critic verdict, not full eval** — eval requires a full build and defeats the
   "cheap preview before spending tokens" purpose; plan+verdict is enough to
   sanity-check direction. **Stakes:** surfacing full eval turns the mode into a

@@ -60,8 +60,8 @@ pub fn build(b: *std.Build) void {
 
     const test_step = b.step("test", "Run unit tests");
     const test_files = [_][]const u8{
-        "src/loop_test.zig",
         "src/builder/builder.zig",
+        "src/builder/builder_test.zig",
         "src/core/engine.zig",
         "src/core/compose.zig",
         "src/core/selfcorr/gate_test.zig",
