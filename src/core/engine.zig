@@ -186,6 +186,7 @@ pub fn newCtx(allocator: std.mem.Allocator, io: std.Io, environ: std.process.Env
     var ctx = try types.Ctx.init(allocator, io, environ, cfg.mode, cfg.backend, key, base, workdir);
     ctx.expected = cfg.expect;
     ctx.max_tokens = cfg.max_tokens;
+    ctx.max_steps = cfg.max_steps;
     ctx.cache = blk: {
         const cp = cfg.cache_path orelse break :blk null;
         const c = allocator.create(cache_mod.Cache) catch break :blk null;

@@ -24,6 +24,7 @@ pub const Ctx = struct {
     workdir: []const u8,
     tokens: usize,
     max_tokens: ?usize,
+    max_steps: ?usize = null,
     cache: ?*cache_mod.Cache,
     eval_error: ?[]const u8,
     /// Optional caller-supplied expected stdout (trimmed) for behavioral

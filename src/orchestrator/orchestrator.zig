@@ -35,6 +35,18 @@ pub fn run(ctx: *types.Ctx, task: []const u8, steps: *std.ArrayList(types.Step))
         });
     }
     ctx.log("[orchestrator] plan: {d} steps", .{steps.items.len});
+    // Autonomous-safety bound: a caller-set --max-steps caps how many steps
+    // the engine may autonomously decompose. An unbounded plan is a real
+    // autonomy risk (runaway scope, unbounded LLM/hardware cost), so when the
+    // bound is exceeded the run fails fast instead of building a sprawling
+    // artifact. Off by default (max_steps == null) so existing pipelines are
+    // unchanged; this is the decomposition analogue of --max-tokens.
+    if (ctx.max_steps) |cap| {
+        if (steps.items.len > cap) {
+            ctx.record("orchestrator: plan exceeded max-steps");
+            return false;
+        }
+    }
     ctx.record("orchestrator: decomposed");
     return true;
 }

@@ -38,6 +38,12 @@ lives in `core/config/config.zig: printHelp`).
 - `--max-tokens N` — soft LLM-spend ceiling; `engine.run` aborts the build loop
   once `ctx.tokens` reaches N, records `engine: token budget exceeded`, deploys
   nothing. Default off.
+- `--max-steps N` — cap on how many steps the orchestrator may autonomously
+  decompose; if the plan exceeds N, `orchestrator.run` aborts the run before
+  any codegen (the decomposition analogue of `--max-tokens`). Guards against an
+  unbounded LLM plan — runaway scope and unbounded LLM/hardware cost. Default
+  off. (Autonomy-safety bound; distinct from the reserved deploy-gating fork
+  in issue #2.)
 - `--kb[=DIR]` / `--kb-max-lines[=N]` — knowledge ledger path and injection cap
   (bare `--kb-max-lines` = 200, default off). See Knowledge base (feat) below.
 - `--tasks FILE` — batch mode: run each non-comment, non-blank line as an

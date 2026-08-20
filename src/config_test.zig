@@ -37,6 +37,8 @@ test "config parses backend + knows feature flags are off by default" {
     try std.testing.expect(cfg.replay_path == null);
     try std.testing.expect(cfg.record_path == null);
     try std.testing.expectEqualStrings("hello", cfg.task);
+    // Off-by-default plan cap must stay off until the flag is passed.
+    try std.testing.expect(cfg.max_steps == null);
 }
 
 test "config --kb-max-lines defaults to 200 (bare) and parses N" {
@@ -80,4 +82,12 @@ test "config --tasks is parsed into the batch path" {
     const argv = [_][]const u8{ "./yuxi", "--tasks", "plan.txt", "--mock" };
     const cfg = try parseArgs(std.testing.allocator, io, &argv);
     try std.testing.expectEqualStrings("plan.txt", cfg.tasks.?);
+}
+
+test "config --max-steps is parsed into the plan cap" {
+    const io = testIo();
+    // --max-steps must be parsed into the plan cap, not silently ignored.
+    const argv = [_][]const u8{ "./yuxi", "--max-steps", "4", "--mock", "--task", "t" };
+    const cfg = try parseArgs(std.testing.allocator, io, &argv);
+    try std.testing.expectEqual(@as(usize, 4), cfg.max_steps.?);
 }
