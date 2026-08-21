@@ -39,6 +39,15 @@ neither reached the ledger the way the two earlier autonomy caps did.
   that actually exists.
 
 
+### `--max-time` / `--max-attempts` documented in `AGENTS.md` (fix, docs, §24)
+- `printHelp` carried `--max-time` and `--max-attempts` (parseable, tested,
+  wired through `Ctx`), but the authoritative flag list in `AGENTS.md` only
+  listed `--max-tokens`/`--max-steps`. A user reading the docs could not
+  discover the two autonomy caps that actually exist. Added both bullets
+  (`--max-time` wall-clock cap, `--max-attempts` retry cap) in the
+  `--max-tokens`/`--max-steps` block, keeping the list in sync with
+  `core/config/config.zig: printHelp`.
+
 ### Governance hygiene: PR template, doc pointer, README glyph, dead import (fix, repo-hygiene, §24/§8/§41-E)
 - `AGENTS.md` gained an `## Autonomous agent governance` section pointing at
   `AUTONOMOUS_AGENT.md` (the README already linked it, but the agent-facing
