@@ -1,6 +1,11 @@
 # Changelog
 
-## Unreleased
+## v0.5.0 (2026-08-21)
+Fifth tagged release. Batching 7 merged PRs (#29, #30, #31, #32, #33, #34, #35) since v0.4.0 —
+a security fix closing the gateway auth no-op (CWE-306, #35), the `--max-time` autonomy-safety
+cap (#30), the `--max-attempts` retry cap (#31), bounded KB ledger on write (#29), the
+`--report` tokens/max_steps_exceeded observability (#33), the `--expect` end-to-end CLI test
+(#34), and the `--tasks` batch KB bound fix (#32). Tagged from master `e48c290` (CI green).
 ### Gateway enforces a real auth secret via `AE_TOKEN_EXPECTED` (fix, security, CWE-306/CWE-287, §11/§14)
 - The gateway's auth was a *presence* check: any non-empty `AE_TOKEN` was
   accepted, which authenticates nothing (CWE-306 Missing Authentication /
