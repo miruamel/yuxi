@@ -225,6 +225,7 @@ affects mock output (and the engine test stays green).
 Critic `REJECT` reasons are persisted too (`knowledge.recordCritic`), so
 future decompositions can steer away from the rejected shape — not only the
 numeric `critic_rej=N` counter that `recordLesson` records.
+- **Lesson dedup (feat):** the KB ledger now writes via `store.appendUnique` instead of `store.save` for the four recorders (`recordLesson`/`recordCritic`/`recordHealth`/`recordBatch`). `appendUnique` skips a new lesson when an identical line already exists on disk, so a recurring failure/critic/health lesson is recorded once, not re-accumulated every run; under `--kb-max-lines` that freed slot is spent on *distinct* lessons rather than duplicates. `store.save` stays the plain-append primitive (tests use it directly). No new flag.
 - **Health-verdict loop (feat):** `monitoring.assessHealth` now returns the
   accumulated autonomy-health verdict (e.g. `no deploy; self-correction
   exhausted; `) instead of only logging it. `engine.run` persists that verdict

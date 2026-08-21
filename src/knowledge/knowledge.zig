@@ -12,6 +12,7 @@ pub fn log(ctx: *types.Ctx, text: []const u8) void {
 // using `knowledge.load`/`knowledge.save` after the extract to `store.zig`.
 pub const load = store.load;
 pub const save = store.save;
+pub const appendUnique = store.appendUnique;
 
 /// Persist a per-run lesson to the configured knowledge base; no-op when none
 /// is set. The lesson captures outcome plus the degradation counters (critic
@@ -39,7 +40,7 @@ pub fn recordLesson(ctx: *types.Ctx, task: []const u8, steps: usize) !void {
                 .{ task, outcome, steps, ctx.deploys, ctx.retries, ctx.critic_rejections, ctx.mock_fallbacks, ctx.token_budgets_exceeded, ctx.max_steps_exceeded },
             );
         defer ctx.allocator.free(lesson);
-        try store.save(ctx.allocator, kb, lesson, ctx.kb_max_lines);
+        try store.appendUnique(ctx.allocator, kb, lesson, ctx.kb_max_lines);
     }
 }
 
@@ -66,7 +67,7 @@ pub fn recordCritic(ctx: *types.Ctx, step_name: []const u8, reason: []const u8) 
             .{ step_name, reason },
         );
         defer ctx.allocator.free(lesson);
-        try store.save(ctx.allocator, kb, lesson, ctx.kb_max_lines);
+        try store.appendUnique(ctx.allocator, kb, lesson, ctx.kb_max_lines);
     }
 }
 
@@ -83,7 +84,7 @@ pub fn recordHealth(ctx: *types.Ctx, verdict: []const u8) !void {
         if (verdict.len == 0) return;
         const lesson = try std.fmt.allocPrint(ctx.allocator, "- health: {s}", .{verdict});
         defer ctx.allocator.free(lesson);
-        try store.save(ctx.allocator, kb, lesson, ctx.kb_max_lines);
+        try store.appendUnique(ctx.allocator, kb, lesson, ctx.kb_max_lines);
     }
 }
 
@@ -103,7 +104,7 @@ pub fn recordBatch(alloc: std.mem.Allocator, kb_path: ?[]const u8, summary: []co
         defer alloc.free(lesson);
         // Honor the operator's --kb-max-lines cap so the batch ledger stays
         // bounded on write, exactly like recordLesson/recordHealth (PR #29).
-        try store.save(alloc, kb, lesson, kb_max_lines);
+        try store.appendUnique(alloc, kb, lesson, kb_max_lines);
     }
 }
 

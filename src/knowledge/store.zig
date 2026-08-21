@@ -59,6 +59,32 @@ pub fn save(alloc: std.mem.Allocator, path: []const u8, lesson: []const u8, max_
         if (trimmed.len < full.len) try fs.writeFileAlloc(alloc, path, trimmed);
     }
 }
+/// Append `lesson` to the knowledge base, but only when an identical line is
+/// not already present on disk. Keeps a bounded ledger from collapsing into
+/// duplicate noise — which would otherwise evict *distinct* lessons under
+/// `--kb-max-lines` — without changing `save`'s plain-append semantics
+/// (tests rely on those). Detection is an exact newline-terminated line match,
+/// so counter-bearing lines that actually differ stay distinct. Unbounded
+/// ledgers also benefit: a re-recorded identical failure no longer
+/// re-accumulates every run.
+pub fn appendUnique(alloc: std.mem.Allocator, path: []const u8, lesson: []const u8, max_lines: ?usize) !void {
+    // Normalize to the exact on-disk line (`save` appends '\n' when absent) so
+    // the duplicate check matches a complete stored line, not a mid-line slice.
+    const needle = if (lesson.len > 0 and lesson[lesson.len - 1] == '\n')
+        lesson
+    else blk: {
+        const buf = try alloc.alloc(u8, lesson.len + 1);
+        @memcpy(buf[0..lesson.len], lesson);
+        buf[lesson.len] = '\n';
+        break :blk buf;
+    };
+    defer if (needle.ptr != lesson.ptr) alloc.free(needle);
+    if (try load(alloc, path)) |prior| {
+        defer alloc.free(prior);
+        if (std.mem.indexOf(u8, prior, needle) != null) return;
+    }
+    try save(alloc, path, lesson, max_lines);
+}
 
 /// Return the last `max` lines of `prior` (or all of it when `max` is null), so
 /// a long-lived KB ledger doesn't get loaded into every decomposition prompt in
