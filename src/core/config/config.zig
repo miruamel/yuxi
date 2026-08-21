@@ -150,7 +150,7 @@ fn printHelp(io: std.Io) void {
     types.logLine(io, "  --out DIR            workdir for this run (default ae_out)", .{});
     types.logLine(io, "  --expect TEXT        behavioral verification string", .{});
     types.logLine(io, "  --max-tokens N       soft LLM-spend ceiling; default off", .{});
-
+    types.logLine(io, "  --max-time N         cap wall-clock per run (seconds); default off", .{});
     types.logLine(io, "  --max-steps N        cap autonomous plan size; default off", .{});
     types.logLine(io, "  --max-attempts N     cap self-correction retries per run (default 3)", .{});
     types.logLine(io, "Knowledge:", .{});

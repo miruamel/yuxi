@@ -54,6 +54,16 @@ lives in `core/config/config.zig: printHelp`).
 - `--max-tokens N` — soft LLM-spend ceiling; `engine.run` aborts the build loop
   once `ctx.tokens` reaches N, records `engine: token budget exceeded`, deploys
   nothing. Default off.
+- `--max-time N` — wall-clock cap (seconds) for a single `engine.run`.
+  Bounds an unattended run: a hung build/eval/deploy can otherwise stall
+  forever. The check is a monotonic-clock read at the self-correction loop;
+  on overrun it increments `ctx.run_time_exceeded` and tail-calls
+  `finishRun` (no deploy). Distinct from a generic failure in the health
+  verdict. Default off.
+- `--max-attempts N` — cap on self-correction retries per run (default 3).
+  NOT a fail-closed safety abort: exhausting retries is the normal
+  "nothing deployed" outcome, so it reuses the existing health-verdict
+  path (no new `attempts_exceeded` clause).
 - `--max-steps N` — cap on how many steps the orchestrator may autonomously
   decompose; if the plan exceeds N, `orchestrator.run` aborts the run before
   any codegen (the decomposition analogue of `--max-tokens`). Guards against an
