@@ -171,8 +171,10 @@ test "main --kb-stats prints a ledger summary and exits zero" {
 
     // --kb-max-lines cap is echoed back by printStats so an operator can see
     // the bound the inspector applied (knowledge.zig:192). This line had no
-    // test; assert it round-trips through the CLI.
-    const capped = try std.process.run(a, io, .{ .argv = &[_][]const u8{ bin, "--no-hitl", "--mock", "--kb-stats", "--kb-max-lines", "5", "--kb", kb } });
+    // test; assert it round-trips through the CLI. The bare form `--kb-max-lines`
+    // defaults to 200 (same convention as --cache/--report/--record), so use
+    // the `=` form to pin the value at 5 rather than asserting on the default.
+    const capped = try std.process.run(a, io, .{ .argv = &[_][]const u8{ bin, "--no-hitl", "--mock", "--kb-stats", "--kb-max-lines=5", "--kb", kb } });
     defer a.free(capped.stdout);
     defer a.free(capped.stderr);
     try std.testing.expect(capped.term == .exited and capped.term.exited == 0);

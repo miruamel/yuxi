@@ -108,6 +108,25 @@ neither reached the ledger the way the two earlier autonomy caps did.
 - CI (`ci.yml`) already used `-j2`; the fix is purely documentation, no
   behavior change. `zig build -j2` and `zig build test -j2` both exit 0.
 
+### `--kb-stats` CLI path now covered end-to-end (test, §11/§21)
+- `knowledge.printStats` (main.zig:30-33) had no test at all — only its pure core
+  `knowledge.summarize` was covered, and its `logLine` formatting plus the
+  no-ledger short-circuit were unexercised. New CLI-shell test asserts both
+  paths: no `--kb` short-circuits with "nothing to summarize" and exit 0; a
+  populated ledger prints all six category counts, the latest line, and echoes
+  the `--kb-max-lines` cap it applied (knowledge.zig:192). The unreadable-ledger
+  path stays untested: `store.load` returns null for a missing file, so the
+  "ledger empty" branch is unreachable in the test sandbox — documented, not
+  chased. All 5 `main_test` roots pass.
+### `assessHealth` `max_steps_exceeded` clause covered (test, §11/§30)
+- The `--max-steps` abort verdict clause (monitoring.zig:174-178) had the same
+  gap as the `run_time_exceeded` clause closed earlier: the unhealthy-cycle
+  test sets critic_rejections/mock_fallbacks/retries/token_budgets but never
+  `max_steps_exceeded`, so the branch was dead in tests. New test sets
+  `ctx.deploys=1` + `ctx.max_steps_exceeded=1` and asserts the verdict carries
+  "max-steps exceeded" and NOT "no deploy", proving the plan-cap abort is a
+  distinct health signal (not folded into the generic no-deploy WARN). All 7
+  `monitoring_test` roots pass.
 ### Human / Other Contributions
 - (none this cycle)
 
