@@ -5,6 +5,7 @@ const loop = @import("loop");
 const monitoring = @import("monitoring");
 const types = @import("types");
 const fs = @import("fs");
+const knowledge = @import("knowledge");
 
 pub fn main(init: std.process.Init) !void {
     const arena = init.arena.allocator();
@@ -21,6 +22,15 @@ pub fn main(init: std.process.Init) !void {
         if (e != error.HelpRequested and e != error.VersionRequested) std.process.exit(1);
         return;
     };
+
+    // `--kb-stats` is a read-only inspector: summarize the configured ledger
+    // and exit 0 without running the engine. This is the §30/§24 observability
+    // surface for what the autonomous loop has learned — a co-owner or audit
+    // can read it without triggering a run or parsing raw ledger lines.
+    if (cfg.kb_stats) {
+        try knowledge.printStats(arena, io, cfg.kb_path, cfg.kb_max_lines);
+        return;
+    }
 
     if (cfg.tasks) |tasks_path| {
         var results = try loop.runTasks(arena, io, init.minimal.environ, cfg, tasks_path);

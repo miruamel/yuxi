@@ -27,6 +27,7 @@ test "loop.runTasks iterates tasks, skips comments, reports health" {
         .kb_path = null,
         .replay_path = null,
         .record_path = null,
+        .kb_stats = false,
     };
 
     var results = try loop.runTasks(allocator, io, .empty, cfg, tasks_path);
@@ -68,6 +69,7 @@ test "loop.runTasks persists a batch summary to the KB when configured" {
         .kb_path = kb_path,
         .replay_path = null,
         .record_path = null,
+        .kb_stats = false,
     };
 
     var results = try loop.runTasks(allocator, io, .empty, cfg, tasks_path);

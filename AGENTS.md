@@ -51,7 +51,14 @@ lives in `core/config/config.zig: printHelp`).
   off. (Autonomy-safety bound; distinct from the reserved deploy-gating fork
   in issue #2.)
 - `--kb[=DIR]` / `--kb-max-lines[=N]` — knowledge ledger path and injection cap
-  (bare `--kb-max-lines` = 200, default off). See Knowledge base (feat) below.
+- `--kb-stats` — read-only inspector: print a category breakdown of the
+  `--kb` ledger (total / deployed / failed / critic-rejected / health / batch /
+  other, plus the latest line) and exit 0 without running the engine. Off by
+  default. Used by `knowledge.printStats`; this is the §30/§24 observability
+  surface for what the autonomous loop has actually learned (a co-owner or audit
+  can read it without triggering a run). No `--kb` path, or an empty/absent
+  ledger, prints a clear "nothing to summarize" line and exits cleanly — it
+  never errors on a missing ledger.
 - `--tasks FILE` — batch mode: run each non-comment, non-blank line as an
   isolated engine cycle and aggregate the autonomy-health report (see
   `loop.zig`).
@@ -315,7 +322,15 @@ Gotchas paid for this cycle:
   Use a fresh smoke dir instead of `rm`.
 - **Spawned `git` has no identity here** — rely on the `-c` flags, never
   assume global `user.name/email` exists.
-
+- **Test hermeticity: never reuse a fixed `/tmp` workdir across runs.** Engine
+  tests that checkpoint into git (`deploy.run`, `recovery_test`, `plan_gate_test`,
+  `ledger_test`) use fixed `/tmp/yuxi_*` dirs. A leftover `.git` from an
+  assistant's earlier direct binary run collides with the test's `git init` /
+  commit and yields cryptic `error: invalid object 100644 ... for 'gen_final.zig'`
+  — a false FAIL that looks like a product bug. Either `deleteTree` the dir at the
+  start of each test (preferred: `defer std.Io.Dir.deleteTree(..., base) catch {}`)
+  or use a unique timestamped dir. Always clean `/tmp/yuxi_*` before a full
+  `zig build test`; the suite does NOT self-clean those paths.
 - **Memory is tight (~354MB free / 4.3GB used):** a full pipeline smoke can OOM.
   Prefer `zig build test` unit/engine tests over launching the binary end-to-end.
 - **CI installs Zig via `mlugg/setup-zig@v2`** (the `goto-bus/setup-zig` slug is a

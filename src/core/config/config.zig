@@ -31,9 +31,12 @@ pub const Config = struct {
     /// policy) consume the machine-readable verdict without the engine
     /// implementing the gating itself. Null = disabled.
     health_hook: ?[]const u8,
-    /// When true, the health hook fires regardless of the verdict (default:
-    /// only on an unhealthy run).
     always_hook: bool,
+    /// When true, `main` prints a read-only summary of the configured
+    /// knowledge ledger and exits without running the engine — an inspection
+    /// surface for what the autonomous loop has actually learned (§30/§24).
+    /// Off by default.
+    kb_stats: bool,
 };
 
 pub fn parse(gpa: std.mem.Allocator, io: std.Io, args: *std.process.Args.Iterator) !Config {
@@ -54,8 +57,9 @@ pub fn parse(gpa: std.mem.Allocator, io: std.Io, args: *std.process.Args.Iterato
     var tasks: ?[]const u8 = null;
     var kb_path: ?[]const u8 = null;
     var kb_max_lines: ?usize = null;
-    var replay_path: ?[]const u8 = null;
+    var kb_stats: bool = false;
     var record_path: ?[]const u8 = null;
+    var replay_path: ?[]const u8 = null;
     _ = args.next(); // argv[0]
     while (args.next()) |arg| {
         if (std.mem.eql(u8, arg, "--hitl")) mode = .hitl else if (std.mem.eql(u8, arg, "--no-hitl")) mode = .no_hitl else if (std.mem.eql(u8, arg, "--mock")) backend = .mock else if (std.mem.eql(u8, arg, "--openai")) backend = .openai else if (std.mem.eql(u8, arg, "--local")) backend = .local else if (std.mem.eql(u8, arg, "--out")) {
@@ -111,14 +115,26 @@ pub fn parse(gpa: std.mem.Allocator, io: std.Io, args: *std.process.Args.Iterato
             record_path = arg["--record=".len..];
         } else if (std.mem.startsWith(u8, arg, "--report=")) {
             report_path = arg["--report=".len..];
-        } else if (task == null) task = arg;
+        } else if (std.mem.eql(u8, arg, "--kb-stats")) {
+            kb_stats = true;
+        } else {
+            // Trailing argument (not a recognized flag) is the task prompt,
+            // e.g. `yuxi "add a calculator"`. Without this, a bare task string
+            // falls through every branch, `task` stays null, and `parse`
+            // returns MissingTask (prints help, exits 1) — breaking the CLI run.
+            task = arg;
+        }
     }
-
+    // `--kb-stats` is a read-only inspector, not a run: it summarizes the
+    // ledger and exits, so it must not trip the missing-task requirement below.
+    if (kb_stats) {
+        return .{ .mode = mode, .backend = backend, .task = "", .workdir = workdir, .cache_path = cache_path, .expect = expect, .max_tokens = max_tokens, .max_steps = max_steps, .max_time_ms = max_time_ms, .max_attempts = max_attempts, .tasks = tasks, .kb_path = kb_path, .kb_max_lines = kb_max_lines, .replay_path = replay_path, .record_path = record_path, .report_path = report_path, .health_hook = health_hook, .always_hook = always_hook, .kb_stats = true };
+    }
     const t = if (tasks) |_| "" else task orelse {
         printHelp(io);
         return error.MissingTask;
     };
-    return .{ .mode = mode, .backend = backend, .task = t, .workdir = workdir, .cache_path = cache_path, .expect = expect, .max_tokens = max_tokens, .max_steps = max_steps, .max_time_ms = max_time_ms, .max_attempts = max_attempts, .tasks = tasks, .kb_path = kb_path, .kb_max_lines = kb_max_lines, .replay_path = replay_path, .record_path = record_path, .report_path = report_path, .health_hook = health_hook, .always_hook = always_hook };
+    return .{ .mode = mode, .backend = backend, .task = t, .workdir = workdir, .cache_path = cache_path, .expect = expect, .max_tokens = max_tokens, .max_steps = max_steps, .max_time_ms = max_time_ms, .max_attempts = max_attempts, .tasks = tasks, .kb_path = kb_path, .kb_max_lines = kb_max_lines, .replay_path = replay_path, .record_path = record_path, .report_path = report_path, .health_hook = health_hook, .always_hook = always_hook, .kb_stats = false };
 }
 fn printHelp(io: std.Io) void {
     types.logLine(io, "Yuxi (玉溪): autonomous software evolution engine", .{});
