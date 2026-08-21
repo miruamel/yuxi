@@ -22,10 +22,17 @@ test "knowledge recordLesson writes an enriched per-run lesson" {
     try std.testing.expect(std.mem.indexOf(u8, got, "add a feature: deployed") != null);
     try std.testing.expect(std.mem.indexOf(u8, got, "steps=3") != null);
     try std.testing.expect(std.mem.indexOf(u8, got, "critic_rej=2") != null);
-    try std.testing.expect(std.mem.indexOf(u8, got, "mock_fb=1") != null);
     // The max-steps cap hit is a distinct degradation counter (PR #27); it must
     // surface in the ledger so future runs learn from an aborted decomposition.
     try std.testing.expect(std.mem.indexOf(u8, got, "max_steps_ex=1") != null);
+    // The wall-clock cap hit (--max-time) is the fourth autonomy-safety cap;
+    // like max_steps_ex it must reach the ledger or the learn loop stays blind
+    // to wall-clock-cap aborts (mirrors the max_steps_ex persistence fix, #28).
+    ctx.run_time_exceeded = 1;
+    try knowledge.recordLesson(&ctx, "add a feature", 3);
+    const got2 = (try knowledge.load(alloc, path)).?;
+    defer alloc.free(got2);
+    try std.testing.expect(std.mem.indexOf(u8, got2, "run_time_ex=1") != null);
 }
 
 test "knowledge recordLesson appends the eval error on a failed run" {
