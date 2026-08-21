@@ -89,6 +89,7 @@ pub fn build(b: *std.Build) void {
         "src/core/selfcorr/plan_gate_test.zig",
         "src/critic/critic.zig",
         "src/evaluator/evaluator.zig",
+        "src/deploy/deploy_test.zig",
         "src/knowledge/store_test.zig",
         "src/knowledge/ledger_test.zig",
         "src/llm/transport.zig",

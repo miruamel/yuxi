@@ -133,8 +133,12 @@ pub fn run(allocator: std.mem.Allocator, io: std.Io, ctx: *types.Ctx, task: []co
     if (verified) {
         const final_path = try std.fmt.allocPrint(allocator, "{s}/gen_final.zig", .{ctx.workdir});
         defer allocator.free(final_path);
-        _ = try deploy.run(ctx, final_path);
-        ctx.deploys += 1;
+        // Only count a deploy when the artifact was actually checkpointed.
+        // deploy.run returns false when git is unavailable or the commit fails,
+        // so the autonomy-health "no deploy" signal stays truthful (§30) instead
+        // of reporting a deploy that never persisted.
+        const deployed = try deploy.run(ctx, final_path);
+        if (deployed) ctx.deploys += 1;
         for (steps.items, 0..) |_, i| {
             const p = try std.fmt.allocPrint(allocator, "{s}/gen_{d}.zig", .{ ctx.workdir, i });
             defer allocator.free(p);

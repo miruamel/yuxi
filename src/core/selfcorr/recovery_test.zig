@@ -56,6 +56,9 @@ test "engine.run self-corrects a broken first build via retry" {
     const allocator = std.heap.page_allocator;
     const io = std.Io.Threaded.global_single_threaded.io();
     const workdir = "/tmp/yuxi_selfcorr_test";
+    // Hermetic: a leftover (possibly corrupted) .git from a prior run would
+    // make deploy.run's commit fail and the run report no deploy. Clean first.
+    std.Io.Dir.deleteTree(std.Io.Dir.cwd(), io, workdir) catch {};
     try fs.ensureDir(allocator, workdir);
 
     var ctx = try types.Ctx.init(allocator, io, .empty, .no_hitl, .mock, null, "", workdir);
@@ -127,6 +130,8 @@ test "engine.run recovers from an LLM-critic REJECT via regenerate" {
     const allocator = std.heap.page_allocator;
     const io = std.Io.Threaded.global_single_threaded.io();
     const workdir = "/tmp/yuxi_reject_recover_test";
+    // Hermetic: clean any prior run's .git so the deploy checkpoint is fresh.
+    std.Io.Dir.deleteTree(std.Io.Dir.cwd(), io, workdir) catch {};
     try fs.ensureDir(allocator, workdir);
 
     var ctx = try types.Ctx.init(allocator, io, .empty, .no_hitl, .mock, null, "", workdir);
