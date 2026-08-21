@@ -35,7 +35,13 @@ neither reached the ledger the way the two earlier autonomy caps did.
   superseded by `recorders_test.zig` in `16daa1f`. Now points at the file
   that actually exists.
 
-### Governance docs + a dead import (fix, repo-hygiene, §24/§8)
+### Governance hygiene: PR template, doc pointer, README glyph, dead import (fix, repo-hygiene, §24/§8/§41-E)
+- **PR template added** (fix, repo-hygiene, §24/§41-E): `.github/PULL_REQUEST_TEMPLATE.md`
+  now embeds the mandatory autonomous-agent context, blast radius, and rollback
+  fields, and links `AUTONOMOUS_AGENT.md` prominently per §41-E. The README already
+  linked the governance doc; the template was the missing touchpoint, so every
+  future PR surfaces the accountability model by default instead of relying on
+  the author to remember it.
 - `AGENTS.md` gained an `## Autonomous agent governance` section pointing at
   `AUTONOMOUS_AGENT.md` (the README already linked it, but the agent-facing
   entry point had no pointer). Open co-owner forks #2 and #41 are named as
