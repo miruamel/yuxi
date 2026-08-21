@@ -51,18 +51,18 @@ test "emitReportAndExit fires the health hook only on an unhealthy run" {
     };
 
     // Unhealthy + hook set → hook must fire.
-    const h1 = try mainmod.emitReportAndExit(a, io, report, fixture, false, unhealthy, null);
+    const h1 = try mainmod.emitReportAndExit(a, io, report, fixture, false, null, null, unhealthy, null);
     try std.testing.expect(!h1);
     try std.testing.expect(fs.fileExists(sentinel));
 
     // Healthy + hook set, no --always-hook → hook must NOT fire again.
     _ = fs.deleteFile(io, sentinel) catch {};
-    const h2 = try mainmod.emitReportAndExit(a, io, report, fixture, false, healthy, null);
+    const h2 = try mainmod.emitReportAndExit(a, io, report, fixture, false, null, null, healthy, null);
     try std.testing.expect(h2);
     try std.testing.expect(!fs.fileExists(sentinel));
 
     // Healthy + --always-hook → hook fires regardless.
-    const h3 = try mainmod.emitReportAndExit(a, io, report, fixture, true, healthy, null);
+    const h3 = try mainmod.emitReportAndExit(a, io, report, fixture, true, null, null, healthy, null);
     try std.testing.expect(h3);
     try std.testing.expect(fs.fileExists(sentinel));
 

@@ -23,6 +23,7 @@ pub fn build(b: *std.Build) void {
     const knowledge = b.addModule("knowledge", .{ .root_source_file = b.path("src/knowledge/knowledge.zig"), .target = target, .optimize = optimize });
     const store = b.addModule("store", .{ .root_source_file = b.path("src/knowledge/store.zig"), .target = target, .optimize = optimize });
     const monitoring = b.addModule("monitoring", .{ .root_source_file = b.path("src/monitoring/monitoring.zig"), .target = target, .optimize = optimize });
+    const report_kb_stats = b.addModule("report_kb_stats", .{ .root_source_file = b.path("src/monitoring/report_kb_stats.zig"), .target = target, .optimize = optimize });
     const fs = b.addModule("fs", .{ .root_source_file = b.path("src/util/fs.zig"), .target = target, .optimize = optimize });
     const cache = b.addModule("cache", .{ .root_source_file = b.path("src/util/cache.zig"), .target = target, .optimize = optimize });
     const builder = b.addModule("builder", .{ .root_source_file = b.path("src/builder/builder.zig"), .target = target, .optimize = optimize });
@@ -44,20 +45,17 @@ pub fn build(b: *std.Build) void {
     version_opt.addOption([]const u8, "version", version_stamp);
     const bopt = b.createModule(.{ .root_source_file = version_opt.getOutput(), .target = target, .optimize = optimize });
 
-
     const mainmod = b.addModule("mainmod", .{ .root_source_file = b.path("src/main.zig"), .target = target, .optimize = optimize });
 
     const all = [_]*std.Build.Module{
-        types,      config,    compose,    engine, step,  gateway, orchestrator, evaluator, deploy,
-        resilience, knowledge, store,      monitoring, fs,     cache, builder, critic,       transport, replay, http,
-        runlife,
-        loop,       mainmod,   bopt,
+        types,      config,    compose, engine,     step,            gateway, orchestrator, evaluator, deploy,
+        resilience, knowledge, store,   monitoring, report_kb_stats, fs,      cache,        builder,   critic,
+        transport,  replay,    http,    runlife,    loop,            mainmod, bopt,
     };
     const all_names = [_][]const u8{
-        "types",      "config",    "compose",    "engine", "step",  "gateway", "orchestrator", "evaluator", "deploy",
-        "resilience", "knowledge", "store", "monitoring", "fs",     "cache", "builder", "critic",       "transport", "replay", "http",
-        "runlife",
-        "loop",       "mainmod",   "build_options",
+        "types",      "config",    "compose", "engine",     "step",            "gateway", "orchestrator",  "evaluator", "deploy",
+        "resilience", "knowledge", "store",   "monitoring", "report_kb_stats", "fs",      "cache",         "builder",   "critic",
+        "transport",  "replay",    "http",    "runlife",    "loop",            "mainmod", "build_options",
     };
 
     // The dependency graph is a DAG, so wiring every module to every other

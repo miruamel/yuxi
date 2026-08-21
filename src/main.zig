@@ -34,7 +34,7 @@ pub fn main(init: std.process.Init) !void {
 
     if (cfg.tasks) |tasks_path| {
         var results = try loop.runTasks(arena, io, init.minimal.environ, cfg, tasks_path);
-        const healthy = try emitReportAndExit(arena, io, cfg.report_path, cfg.health_hook, cfg.always_hook, null, results.items);
+        const healthy = try emitReportAndExit(arena, io, cfg.report_path, cfg.health_hook, cfg.always_hook, cfg.kb_path, cfg.kb_max_lines, null, results.items);
         // results owns task+verdict dups per element; deinit only frees the
         // array, so release the element slices explicitly before tearing down.
         for (results.items) |r| {
@@ -56,7 +56,7 @@ pub fn main(init: std.process.Init) !void {
     // (inside emitReportAndExit) reads single by reference and does not own it.
     const single = try monitoring.taskResult(arena, cfg.task, &ctx, hv);
     defer arena.free(single.verdict);
-    const healthy = try emitReportAndExit(arena, io, cfg.report_path, cfg.health_hook, cfg.always_hook, single, null);
+    const healthy = try emitReportAndExit(arena, io, cfg.report_path, cfg.health_hook, cfg.always_hook, cfg.kb_path, cfg.kb_max_lines, single, null);
     ctx.allocator.free(hv.verdict);
     if (!healthy) std.process.exit(1);
 }
@@ -71,7 +71,7 @@ pub fn main(init: std.process.Init) !void {
 /// policy) — it makes the verdict observable to a consumer without the engine
 /// implementing the gate itself (issue #2 fork is intentionally NOT built here).
 /// A hook failure is logged but never changes the process exit status.
-pub fn emitReportAndExit(alloc: std.mem.Allocator, io: std.Io, report_path: ?[]const u8, hook: ?[]const u8, always_hook: bool, single: ?monitoring.TaskResult, batch: ?[]const monitoring.TaskResult) !bool {
+pub fn emitReportAndExit(alloc: std.mem.Allocator, io: std.Io, report_path: ?[]const u8, hook: ?[]const u8, always_hook: bool, kb_path: ?[]const u8, kb_max_lines: ?usize, single: ?monitoring.TaskResult, batch: ?[]const monitoring.TaskResult) !bool {
     const version = comptime @import("build_options").version;
     var all_healthy = true;
     if (single) |s| all_healthy = s.healthy;
@@ -89,7 +89,7 @@ pub fn emitReportAndExit(alloc: std.mem.Allocator, io: std.Io, report_path: ?[]c
         report_for_hook = tmp_report;
     }
     if (report_for_hook) |p| {
-        monitoring.writeReport(alloc, io, p, version, single, batch) catch |e| types.logLine(io, "[main] report write failed: {s}", .{@errorName(e)});
+        monitoring.writeReport(alloc, io, p, version, single, batch, kb_path, kb_max_lines) catch |e| types.logLine(io, "[main] report write failed: {s}", .{@errorName(e)});
     }
     if (hook) |cmd| {
         if (!all_healthy or always_hook) {

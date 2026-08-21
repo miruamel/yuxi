@@ -14,3 +14,5 @@ zt_cache_*
 
 # cache
 .yuxi_cache
+# JSON health report emitted by --report (run artifact, not source)
+.yuxi_report.json

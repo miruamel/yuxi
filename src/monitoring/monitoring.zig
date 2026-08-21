@@ -1,6 +1,7 @@
 const std = @import("std");
 const types = @import("types");
 const fs = @import("fs");
+const report_kb_stats = @import("report_kb_stats");
 
 /// Emit the run's autonomy metrics (counters + tokens) alongside the event
 /// log, so the loop can read its own effectiveness at a glance. Purely
@@ -90,19 +91,25 @@ pub fn taskResult(alloc: std.mem.Allocator, task: []const u8, ctx: *types.Ctx, h
 /// emitted as a top-level `"version"` field on every report so an external
 /// gate comparing reports across deploys can tell which engine version
 /// produced each one — a release stamp that travels with the artifact.
-pub fn writeReport(allocator: std.mem.Allocator, io: std.Io, path: []const u8, version: []const u8, single: ?TaskResult, batch: ?[]const TaskResult) !void {
+pub fn writeReport(allocator: std.mem.Allocator, io: std.Io, path: []const u8, version: []const u8, single: ?TaskResult, batch: ?[]const TaskResult, kb_path: ?[]const u8, kb_max_lines: ?usize) !void {
     _ = io;
     var buf = try std.ArrayList(u8).initCapacity(allocator, 256);
     defer buf.deinit(allocator);
+    // One top-level object on every report: { "version":..., <results>, "kb_stats":... }.
+    // Both the single ("task":) and batch ("batch_healthy" + "tasks":[]) shapes are
+    // sibling fields of this object, so the document is always valid JSON — a gate can
+    // parse it directly instead of matching substrings (the prior single shape emitted
+    // two sibling objects, which is malformed; consumers must never receive that).
     try buf.appendSlice(allocator, "{\"version\":\"");
     // The version is a build constant; escape defensively in case a future
     // stamp ever contains a quote/backslash (current `git describe` output
     // cannot, but the writer must stay valid JSON either way).
-    const esc_ver = escapeJson(allocator, version) catch "";
+    const esc_ver = report_kb_stats.escapeJson(allocator, version) catch "";
     if (esc_ver.len > 0) try buf.appendSlice(allocator, esc_ver);
     try buf.appendSlice(allocator, "\",");
     if (single) |s| {
-        try appendResult(allocator, &buf, s);
+        try buf.appendSlice(allocator, "\"task\":");
+        try appendResultInner(allocator, &buf, s);
     } else if (batch) |results| {
         var all_healthy = true;
         for (results) |r| {
@@ -113,10 +120,15 @@ pub fn writeReport(allocator: std.mem.Allocator, io: std.Io, path: []const u8, v
         try buf.appendSlice(allocator, ",\"tasks\":[");
         for (results, 0..) |r, i| {
             if (i > 0) try buf.appendSlice(allocator, ",");
-            try appendResult(allocator, &buf, r);
+            try appendResultInner(allocator, &buf, r);
         }
-        try buf.appendSlice(allocator, "]}");
+        try buf.appendSlice(allocator, "]");
     }
+    // Compose the read-only KB ledger summary into the same report (§12/§30):
+    // a gate now sees both autonomy-health and what the loop has learned.
+    try report_kb_stats.appendKbStats(allocator, &buf, kb_path, kb_max_lines);
+    // Close the single top-level object.
+    try buf.appendSlice(allocator, "}");
     if (std.fs.path.dirname(path)) |dir| {
         if (dir.len > 0) try fs.ensureDir(allocator, dir);
     }
@@ -124,28 +136,15 @@ pub fn writeReport(allocator: std.mem.Allocator, io: std.Io, path: []const u8, v
 }
 
 /// Minimal JSON string escape: `"`, `\`, and control chars U+0000–U+001F
-/// (RFC 8259). Reused so a report never carries malformed JSON from a task
-/// containing raw control bytes.
-fn escapeJson(alloc: std.mem.Allocator, s: []const u8) ![]u8 {
-    var out = try std.ArrayList(u8).initCapacity(alloc, s.len);
-    for (s) |c| {
-        switch (c) {
-            '"' => try out.appendSlice(alloc, "\\\""),
-            '\\' => try out.appendSlice(alloc, "\\\\"),
-            else => {
-                if (c < 0x20) {
-                    var ebuf: [6]u8 = undefined;
-                    const n = std.fmt.bufPrint(&ebuf, "\\u{X:0>4}", .{c}) catch unreachable;
-                    try out.appendSlice(alloc, ebuf[0..n.len]);
-                } else {
-                    try out.append(alloc, c);
-                }
-            },
-        }
-    }
-    return out.toOwnedSlice(alloc);
+/// (RFC 8259). Defined in `report_kb_stats.escapeJson`; re-exported here so
+/// existing call sites (`appendResultInner`) keep the name.
+pub fn escapeJson(alloc: std.mem.Allocator, s: []const u8) ![]u8 {
+    return report_kb_stats.escapeJson(alloc, s);
 }
-fn appendResult(alloc: std.mem.Allocator, buf: *std.ArrayList(u8), r: TaskResult) !void {
+/// Append one TaskResult as an inner JSON object `{...}` (no field key, no
+/// surrounding comma). The caller supplies the field name ("task":) and any
+/// preceding/leading commas so the enclosing report object stays valid.
+fn appendResultInner(alloc: std.mem.Allocator, buf: *std.ArrayList(u8), r: TaskResult) !void {
     const esc_task = try escapeJson(alloc, r.task);
     defer alloc.free(esc_task);
     const esc_verdict = try escapeJson(alloc, r.verdict);
