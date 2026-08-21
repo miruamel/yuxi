@@ -2,15 +2,36 @@ const std = @import("std");
 const types = @import("types");
 
 pub fn run(ctx: *types.Ctx, task: []const u8) !?[]const u8 {
-    // Auth: optional token gate.
-    const tok = std.process.Environ.getPosix(ctx.environ, "AE_TOKEN");
-    if (tok) |t| {
-        if (t.len == 0) {
-            ctx.log("[gateway] auth: empty token -> reject", .{});
+    // Auth: optional token gate. Two modes, both opt-in / fail-closed:
+    //  - If AE_TOKEN_EXPECTED is set, the presented AE_TOKEN must match it
+    //    (constant-time compare). This closes CWE-306/CWE-287 — a bare
+    //    "token is present" check accepts ANY non-empty token, which is no
+    //    authentication at all. Operators that care set the expected value;
+    //    the run refuses to proceed on mismatch or on a missing/empty token.
+    //  - If AE_TOKEN_EXPECTED is unset, the legacy behavior holds: any
+    //    non-empty AE_TOKEN is accepted and a missing one is accepted too
+    //    (auth effectively disabled). This keeps dev/offline runs and every
+    //    existing test untouched while letting real deployments enforce a
+    //    real secret. The engine still does NOT gate its own deploys (issue
+    //    #2 fork is untouched) — this only fixes the auth check it already claims.
+    if (std.process.Environ.getPosix(ctx.environ, "AE_TOKEN_EXPECTED")) |expected| {
+        const presented = std.process.Environ.getPosix(ctx.environ, "AE_TOKEN");
+        if (presented == null or presented.?.len == 0 or !ctEq(presented.?, expected)) {
+            ctx.log("[gateway] auth: token mismatch -> reject", .{});
             return null;
         }
+        ctx.log("[gateway] auth: ok (token matched AE_TOKEN_EXPECTED)", .{});
+    } else {
+        // Legacy presence-only check (unchanged behavior).
+        const tok = std.process.Environ.getPosix(ctx.environ, "AE_TOKEN");
+        if (tok) |t| {
+            if (t.len == 0) {
+                ctx.log("[gateway] auth: empty token -> reject", .{});
+                return null;
+            }
+        }
+        ctx.log("[gateway] auth: ok (token={s})", .{if (tok) |_| "set" else "none"});
     }
-    ctx.log("[gateway] auth: ok (token={s})", .{if (tok) |_| "set" else "none"});
 
     // Validation.
     if (task.len < 3) {
@@ -52,4 +73,14 @@ fn redact(allocator: std.mem.Allocator, s: []const u8) ![]u8 {
         }
     }
     return out.toOwnedSlice(allocator);
+}
+
+/// Constant-time string equality: returns false on length mismatch without
+/// short-circuiting the compare, so a wrong token isn't distinguishable by
+/// how-far-it-matched timing. Used for the AE_TOKEN_EXPECTED gate above.
+fn ctEq(a: []const u8, b: []const u8) bool {
+    if (a.len != b.len) return false;
+    var diff: u8 = 0;
+    for (a, b) |x, y| diff |= x ^ y;
+    return diff == 0;
 }
