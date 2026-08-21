@@ -36,12 +36,6 @@ neither reached the ledger the way the two earlier autonomy caps did.
   that actually exists.
 
 ### Governance hygiene: PR template, doc pointer, README glyph, dead import (fix, repo-hygiene, §24/§8/§41-E)
-- **PR template added** (fix, repo-hygiene, §24/§41-E): `.github/PULL_REQUEST_TEMPLATE.md`
-  now embeds the mandatory autonomous-agent context, blast radius, and rollback
-  fields, and links `AUTONOMOUS_AGENT.md` prominently per §41-E. The README already
-  linked the governance doc; the template was the missing touchpoint, so every
-  future PR surfaces the accountability model by default instead of relying on
-  the author to remember it.
 - `AGENTS.md` gained an `## Autonomous agent governance` section pointing at
   `AUTONOMOUS_AGENT.md` (the README already linked it, but the agent-facing
   entry point had no pointer). Open co-owner forks #2 and #41 are named as
@@ -51,19 +45,33 @@ neither reached the ledger the way the two earlier autonomy caps did.
   landed on disk. Now shell-safe.
 - `src/core/selfcorr/plan_gate_test.zig` imported `config` and never used it;
   removed (Kilo Code Review nitpick). Build still green.
+- **PR template added** (fix, repo-hygiene, §24/§41-E): `.github/PULL_REQUEST_TEMPLATE.md`
+  now embeds the mandatory autonomous-agent context, blast radius, and rollback
+  fields, and links `AUTONOMOUS_AGENT.md` prominently per §41-E. The README already
+  linked the governance doc; the template was the missing touchpoint, so every
+  future PR surfaces the accountability model by default instead of relying on
+  the author to remember it.
+- `CONTRIBUTING.md` added (fix, repo-hygiene, §24): the README linked
+  `AUTONOMOUS_AGENT.md` and the PR template embedded the agent context, but
+  there was no contributor-facing guide explaining how to open an issue,
+  review a PR, or raise concerns. `CONTRIBUTING.md` now points at the
+  governance doc and documents the branching/commit/verification-gate
+  conventions, including the `--jobs 2` resource cap.
 
 ## v0.6.0 (2026-08-21)
 Seventh tagged release. Batches three substantive changes merged to `master` since v0.5.1.
-- `feat(knowledge)`: the KB ledger now writes via `store.appendUnique` for the four
-  recorders (`recordLesson`/`recordCritic`/`recordHealth`/`recordBatch`), so a recurring
-  failure/critic/health lesson is recorded once instead of re-accumulated every run; under
-  `--kb-max-lines` the freed slot is spent on *distinct* lessons. No new flag; `store.save`
-  stays the plain-append primitive (tests use it directly). #38.
-- `fix(deploy)`: `deploy.run` reports a real checkpoint status (`!bool`) instead of swallowing
-  git results, and `engine.run` only counts `ctx.deploys` on a real commit — the loop now reads
-  its own deployment effectiveness honestly (§30). Two latent bugs fixed in the process: git was
-  spawned through `ctx.io` (`.failing` allocator) and the commit check only scanned stderr while
-  git prints `nothing to commit` to stdout. `ec2f8fa` (CI green).
+### 🤖 Autonomous Agent Contributions
+- **PR #38:** KB ledger now deduplicates identical lessons via `store.appendUnique` for the
+  four recorders; recurring failures/critics/health lines recorded once, distinct lessons
+  preserved under `--kb-max-lines` (fix, reliability/perf, §8).
+- **PR #40:** `--kb-stats` read-only knowledge-ledger inspector added (feat, observability, §12/§30).
+- **PR #42:** `deploy.run` now reports a real checkpoint status (`!bool`) and `engine.run` only
+  counts `ctx.deploys` on a real commit; git spawned through a real-allocator `Threaded` io with
+  the OS environ (fix, deploy honesty, §30).
+### Human / Other Contributions
+- **Co-owner:** README flag list + Safety section updated (`--kb-stats`, `--max-time`,
+  `--max-attempts`); runtime sandboxing flagged as a deliberate design bet for co-owner input
+  (issue #41).
 - `feat(observability)`: `--kb-stats` is a read-only inspector that loads the configured `--kb`
   ledger, prints a category breakdown (total / deployed / failed / critic-rejected / health /
   batch / other + latest line), and exits 0 without running the engine. With no `--kb` path or an
