@@ -22,6 +22,14 @@ neither reached the ledger the way the two earlier autonomy caps did.
   All 4 `plan_gate` tests pass; full suite green (`zig build test -j2`, 11 roots).
 - Files: `src/core/types.zig` (`Ctx.clock_ns` + `ClockNs`), `src/core/engine.zig`
   (per-attempt guard), `src/core/selfcorr/plan_gate_test.zig` (regression test).
+### `clockNs` / `wallClockExceeded` moved to `runlife.zig` (refactor, §8 SLOC cap)
+- The in-loop cap fix pushed `engine.zig` to 209 SLOC, breaching the §8 ≤200
+  ceiling. The two clock helpers already belonged to `runlife.zig`'s domain
+  (it owns the LAYER 7-9 tail and `flushRecord`); extracting them dropped
+  `engine.zig` to 189 SLOC with no behavior change — every call site prefixed
+  `runlife.`, and the in-loop regression test still passes. Same lesson as the
+  earlier `finishRun`/`flushRecord` extraction: re-check the §8 SLOC ceiling
+  after a feature lands, before it drifts over.
 ### `--kb` was a silent no-op on a single `--task` run (fix, reliability, §11/§12)
 - `engine.newCtx` threaded `kb_max_lines`, `replay_path`, and `record_path`
   through to the `Ctx`, but **not `kb_path`** — so `ctx.kb_path` stayed `null`
