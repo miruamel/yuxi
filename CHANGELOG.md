@@ -1,6 +1,19 @@
 # Changelog
 
 ## Unreleased
+### Gateway enforces a real auth secret via `AE_TOKEN_EXPECTED` (fix, security, CWE-306/CWE-287, §11/§14)
+- The gateway's auth was a *presence* check: any non-empty `AE_TOKEN` was
+  accepted, which authenticates nothing (CWE-306 Missing Authentication /
+  CWE-287 Improper Authentication). Now, when the operator sets
+  `AE_TOKEN_EXPECTED=<secret>`, the presented `AE_TOKEN` must match it via a
+  constant-time compare or the run is rejected (fail-closed). Without
+  `AE_TOKEN_EXPECTED` the legacy behavior is preserved (any non-empty token or
+  none accepted), so dev/offline runs and every existing test are unchanged.
+  This only corrects the check the engine already claimed to perform — it does
+  NOT gate deploys (issue #2's deploy-gating fork stays reserved for the
+  co-owner). `gateway_test.zig` adds three cases: mismatch → reject, missing
+  token → reject, correct token → admit (and PII still sanitized post-auth).
+
 
 ### Wall-clock autonomy cap: `--max-time N` (feat, autonomy safety, §11/§14)
 - New `--max-time N` caps how long a single engine.run may take (seconds),

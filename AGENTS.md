@@ -28,6 +28,12 @@ lives in `core/config/config.zig: printHelp`).
 - `--mock` / `--openai` / `--local` — LLM backend.
 - `--task TEXT` or trailing arg — the task prompt.
 - `--out DIR` — workdir (default `ae_out/`); isolated git repo lives here.
+- **Gateway auth (env, not a flag):** `AE_TOKEN` is an optional presence gate.
+  For a *real* secret, set `AE_TOKEN_EXPECTED=<secret>` — then `AE_TOKEN` must
+  match it (constant-time) or the run is rejected (fail-closed, CWE-306/#35).
+  Without `AE_TOKEN_EXPECTED`, the legacy behavior holds: any non-empty
+  `AE_TOKEN` (or none) is accepted. Dev/offline runs are unaffected. The engine
+  still does NOT gate its own deploys — see issue #2.
 - `--cache[=DIR]` — opt-in on-disk LLM-response cache (default `.yuxi_cache`).
 - `--replay[=FILE]` — opt-in recorded-LLM-response file; `transport.complete` serves entries in call order for `.openai`/`.local` without calling the network (offline CI/tests). Entries delimited by `---` lines.
 - `--record[=FILE]` — opt-in capture of every real (non-seam, non-replay) LLM
