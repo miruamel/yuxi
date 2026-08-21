@@ -127,6 +127,27 @@ neither reached the ledger the way the two earlier autonomy caps did.
   "max-steps exceeded" and NOT "no deploy", proving the plan-cap abort is a
   distinct health signal (not folded into the generic no-deploy WARN). All 7
   `monitoring_test` roots pass.
+### `--kb-stats` short-circuit dropped the `--kb-max-lines` cap (fix, reliability, §11/§12)
+- `config.parse` short-circuited on `--kb-stats` and returned a struct with
+  `kb_max_lines = null` (config.zig:130-131), so `knowledge.printStats` never
+  reached its cap-echo line (knowledge.zig:192) — an operator who passed
+  `--kb-max-lines` to the inspector saw the same output as one who didn't.
+  The short-circuit now returns the parsed cap (bare form still defaults to
+  200, matching `--cache`/`--report`/`--record`). New `--kb-max-lines=5`
+  assertion in `main_test` covers the populated-ledger cap echo.
+### `emitReportAndExit` temp-report path covered (test, §11/§21)
+- `main.emitReportAndExit` writes a temp report and passes it to the health hook
+  when the caller sets `--health-hook` WITHOUT `--report`. The existing hook test
+  always supplied a `--report` path, so that branch was dead in tests — a
+  regression there would have meant a hook firing with no machine-readable
+  input. New test passes `report_path=null` + an unhealthy `TaskResult` and
+  asserts the hook fires (sentinel written) and the temp report is cleaned up
+  afterwards. All 4 `main_test` roots pass.
+### `--kb-stats` echoes the `--kb-max-lines` cap (test, §11/§21)
+- `knowledge.printStats` logs the bound it applied (knowledge.zig:192) so an
+  operator can see it, but no test round-tripped it through the CLI. New
+  assertion runs `--kb-stats --kb-max-lines=5` against the populated ledger
+  and expects the `cap (--kb-max-lines): 5` line in stdout, exit 0.
 ### Human / Other Contributions
 - (none this cycle)
 
