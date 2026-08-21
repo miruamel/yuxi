@@ -239,7 +239,7 @@ passes and `--expect "nope"` triggers the retry path.
 ## Knowledge base (feat)
 `--kb[=DIR]` enables a persistent lesson ledger the engine learns from across
 runs — the core autonomous-evolution loop. Each run appends one line to `<DIR>`
-outcome (deployed/failed) plus degradation counters (critic_rejections, mock_fallbacks, token_budgets_exceeded, max_steps_exceeded); step count, deploys, retries; the orchestrator
+outcome (deployed/failed) plus degradation counters (critic_rejections, mock_fallbacks, token_budgets_exceeded, max_steps_exceeded, run_time_exceeded); step count, deploys, retries; the orchestrator
 prepends prior lessons to its decomposition prompt so later runs avoid
 repeating failures. Opt-in and off by default (`Ctx.kb_path = null`): with
 `--kb` unset no file I/O occurs and every existing test/pipeline path is
@@ -268,11 +268,13 @@ numeric `critic_rej=N` counter that `recordLesson` records.
   Null by default (no cap = historical behavior). Wire: `config.kb_max_lines`
   → `Ctx.kb_max_lines` → `knowledge.injectPrompt` → `tailLessons`.
 
-`Ctx` carries seven autonomy-health counters incremented at their event sites:
+`Ctx` carries eight autonomy-health counters incremented at their event sites:
 critic_rejections, mock_fallbacks, retries (self-correction rebuilds), deploys,
 network_retries (recovered HTTP retries from `http.complete`),
-token_budgets_exceeded, and max_steps_exceeded (set when `--max-steps` aborts
-the decomposition — distinct from a generic failure). `monitoring.report` emits
+token_budgets_exceeded, max_steps_exceeded (set when `--max-steps` aborts
+the decomposition — distinct from a generic failure), and
+run_time_exceeded (set when `--max-time` aborts a run — distinct from a
+generic failure). `monitoring.report` emits
 them alongside events/tokens
 so the loop can read its own effectiveness (critic reject rate, mock-fallback
 frequency, retry churn, deploy rate) without parsing event strings.
@@ -413,6 +415,7 @@ never a bare `ctx.allocator.free(e)` that leaves a dangling pointer for a later
 
 ## Recent cycles (category balance, §14)
 - `74d93fd` feat: offline record mode (--record) captures a --replay-compatible transcript; closes the record/replay loop (§12).
+- `fefa712` fix(knowledge): `--kb` was a silent no-op on a single `--task` run (engine.newCtx never wired `cfg.kb_path` into the Ctx, so `recordLesson`/`recordHealth`/`injectPrompt` were all no-ops on the primary CLI path; only `--tasks` ever wrote a ledger, via `recordBatch` called directly with `cfg.kb_path`), and `recordLesson` omitted `run_time_ex` (the `--max-time` counter was surfaced by `assessHealth`/`report`/`TaskResult` but never persisted, mirroring the `max_steps_ex`/`token_budgets_exceeded` fixes in #27/#28). PR #42.
 - `7ae51bc` refactor: split core/selfcorr_test.zig (241 SLOC, §8 breach) into core/selfcorr/{recovery,gate}_test.zig; deepens nesting, frees core/ 5-file cap (§8/§9).
 - `5521d48` feat: offline replay mode (--replay) drives real .openai/.local backend path offline for CI/tests (§11/§21).
 - `fac5fa4` feat: persistent knowledge base (--kb) learns lessons across runs (§11/§12).
