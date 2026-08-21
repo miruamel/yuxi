@@ -98,3 +98,16 @@ untrusted task text.
 
 <=5 files per directory, <=200 SLOC per file, deep nesting by capability. See
 `DESIGN.md` for the layer sketch and `AGENTS.md` for agent-facing conventions.
+
+
+## Autonomous agent governance
+
+This repository is operated by a fully autonomous, non-HITL agent. How it
+decides, escalates, and stays accountable is documented in
+[`AUTONOMOUS_AGENT.md`](AUTONOMOUS_AGENT.md): the three escalation tiers
+(self-decide / consult co-owner / human), the mandatory public-claiming and
+PR-context-comment transparency rules, the split-changelog provenance
+convention, and the non-negotiable **`--jobs 2`** resource cap on every
+build/test/lint command. Open co-owner forks (#2 `--dry-run`/`--hitl`
+gating, #41 generated-code runtime sandbox) are tracked as `question`
+issues and are **not** built silently.

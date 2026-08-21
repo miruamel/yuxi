@@ -137,6 +137,7 @@ test "engine.run bounds self-correction retries to --max-attempts" {
     // failed-evaluation follow-up (0 since attempt+1 < max_attempts is false).
     try std.testing.expect(ctx.deploys == 0);
     const final_path = try std.fmt.allocPrint(allocator, "{s}/gen_final.zig", .{workdir});
+
     defer allocator.free(final_path);
     try std.testing.expect(!fs.fileExists(final_path));
 }

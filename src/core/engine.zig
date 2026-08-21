@@ -177,6 +177,13 @@ pub fn newCtx(allocator: std.mem.Allocator, io: std.Io, environ: std.process.Env
         c.* = cache_mod.Cache.init(allocator, cp) catch break :blk null;
         break :blk c;
     };
+    // Wire the configured knowledge-base path so a single --task run can
+    // persist lessons and receive prior lessons in its decomposition prompt.
+    // This mirrors the four sibling fields below (kb_max_lines, replay_path,
+    // record_path); without it `--kb` is a silent no-op on the primary CLI
+    // path — only --tasks wrote a ledger, because loop.runTasks calls
+    // recordBatch directly with cfg.kb_path instead of going through the ctx.
+    ctx.kb_path = cfg.kb_path;
     ctx.kb_max_lines = cfg.kb_max_lines;
     ctx.replay_path = cfg.replay_path;
     ctx.record_path = cfg.record_path;
