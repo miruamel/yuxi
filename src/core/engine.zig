@@ -17,7 +17,17 @@ const cache_mod = @import("cache");
 pub fn run(allocator: std.mem.Allocator, io: std.Io, ctx: *types.Ctx, task: []const u8) !void {
     types.logLine(io, "=== Yuxi (玉溪): autonomous software evolution engine ===", .{});
     types.logLine(io, "[engine] mode={s} backend={s}", .{ @tagName(ctx.mode), @tagName(ctx.backend) });
-    defer flushRecord(allocator, ctx);
+    // Wall-clock autonomy cap (--max-time). A hung build/eval/deploy must not
+    // run unattended forever; the timer starts here so the whole run is bounded.
+    var start_ns: ?u64 = null;
+    if (ctx.max_time_ms != null) {
+        var ts: std.os.linux.timespec = undefined;
+        if (std.os.linux.clock_gettime(std.os.linux.CLOCK.MONOTONIC, &ts) == 0) {
+            start_ns = @as(u64, @intCast(ts.sec)) * std.time.ns_per_s + @as(u64, @intCast(ts.nsec));
+        } else {
+            start_ns = null;
+        }
+    }
     try fs.ensureDir(allocator, ctx.workdir);
 
     // LAYER 1: Gateway. On admission it returns the *sanitized* task (PII
@@ -62,6 +72,24 @@ pub fn run(allocator: std.mem.Allocator, io: std.Io, ctx: *types.Ctx, task: []co
     defer if (feedback) |f| allocator.free(f);
     const max_attempts: usize = 3;
     var attempt: usize = 0;
+    // Wall-clock cap: abort fail-closed if the run has overrun --max-time.
+    if (start_ns) |t0| {
+        if (ctx.max_time_ms) |ms| {
+            var ts: std.os.linux.timespec = undefined;
+            var now_ns: u64 = 0;
+            if (std.os.linux.clock_gettime(std.os.linux.CLOCK.MONOTONIC, &ts) == 0) {
+                now_ns = @as(u64, @intCast(ts.sec)) * std.time.ns_per_s + @as(u64, @intCast(ts.nsec));
+            } else {
+                now_ns = 0;
+            }
+            if (now_ns - t0 >= ms * std.time.ns_per_ms) {
+                ctx.record("engine: wall-clock cap exceeded");
+                ctx.run_time_exceeded += 1;
+                ctx.log("[engine] wall-clock cap ({d} ms) exceeded; aborting run", .{ms});
+                return finishRun(ctx, false, steps.items.len, safe_task);
+            }
+        }
+    }
     while (attempt < max_attempts) : (attempt += 1) {
         if (ctx.max_tokens) |mt| {
             if (ctx.tokens >= mt) {
@@ -187,6 +215,7 @@ pub fn newCtx(allocator: std.mem.Allocator, io: std.Io, environ: std.process.Env
     ctx.expected = cfg.expect;
     ctx.max_tokens = cfg.max_tokens;
     ctx.max_steps = cfg.max_steps;
+    ctx.max_time_ms = cfg.max_time_ms;
     ctx.cache = blk: {
         const cp = cfg.cache_path orelse break :blk null;
         const c = allocator.create(cache_mod.Cache) catch break :blk null;

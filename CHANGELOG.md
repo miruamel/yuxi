@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+### Wall-clock autonomy cap: `--max-time N` (feat, autonomy safety, §11/§14)
+- New `--max-time N` caps how long a single engine.run may take (seconds),
+  aborting fail-closed once the wall-clock budget is spent. An unattended
+  autonomous run with a hung build/eval/deploy would otherwise stall forever;
+  this bounds the whole run the way `--max-steps` bounds decomposition and
+  `--max-tokens` bounds LLM spend. Off by default (`max_time_ms == null`):
+  existing pipelines and every current test are unchanged. Plumbing mirrors
+  the other caps: `config.parse` → `Config.max_time_ms` (seconds→ms) →
+  `Ctx.max_time_ms` (via `engine.newCtx`) → a monotonic-clock check at the
+  top of the self-correction loop in `engine.run`. On expiry it increments
+  `ctx.run_time_exceeded` and returns `finishRun` (no deploy). Mirrors
+  `max_steps_exceeded`/`token_budgets_exceeded`: `monitoring.assessHealth`
+  emits a dedicated `wall-time exceeded; ` WARN so the cap hit is machine-
+  distinguishable from a generic failure, and the JSON report carries the
+  counter. Tests: `config_test` asserts `--max-time 2` → 2000 ms; a new
+  `engine.run` test asserts a zero cap aborts before deploy with
+  `run_time_exceeded == 1` and the verdict persisted to the KB. This is an
+  autonomy-safety bound only; it does not touch the reserved issue #2
+  deploy-gating fork.
+
 ### KB ledger now bounded on write (fix, reliability/perf, §8, PR #29)
 - `knowledge.save` appended lessons without limit while only `tailLessons`
   bounded what got injected into the next decomposition prompt. For a

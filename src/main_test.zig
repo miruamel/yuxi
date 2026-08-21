@@ -30,6 +30,7 @@ test "emitReportAndExit fires the health hook only on an unhealthy run" {
         .critic_rejections = 1,
         .mock_fallbacks = 0,
         .token_budgets_exceeded = 0,
+        .run_time_exceeded = 0,
         .healthy = false,
         .verdict = "x",
     };
@@ -40,6 +41,7 @@ test "emitReportAndExit fires the health hook only on an unhealthy run" {
         .critic_rejections = 0,
         .mock_fallbacks = 0,
         .token_budgets_exceeded = 0,
+        .run_time_exceeded = 0,
         .healthy = true,
         .verdict = "",
     };

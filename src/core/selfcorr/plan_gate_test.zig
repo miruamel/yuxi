@@ -64,3 +64,30 @@ test "engine.run aborts on a rejected plan before codegen" {
     defer allocator.free(kb);
     try std.testing.expect(std.mem.indexOf(u8, kb, "critic rejected") != null);
 }
+
+test "engine.run aborts on a wall-clock cap (--max-time) before deploy" {
+    // Regression for the --max-time autonomy-safety cap: a zero cap must abort
+    // the run fail-closed (no deploy, no artifact) and count run_time_exceeded,
+    // distinct from a generic failure. Mirrors the --max-steps gate test.
+    const allocator = std.heap.page_allocator;
+    const io = std.Io.Threaded.global_single_threaded.io();
+    const workdir = "/tmp/yuxi_maxtime_test";
+    std.Io.Dir.deleteTree(std.Io.Dir.cwd(), io, workdir) catch {};
+    try fs.ensureDir(allocator, workdir);
+
+    var ctx = try types.Ctx.init(allocator, io, .empty, .no_hitl, .mock, null, "", workdir);
+    ctx.kb_path = "/tmp/yuxi_maxtime_test/kb.md";
+    // Zero cap: the guard fires on the first attempt-loop check.
+    ctx.max_time_ms = 0;
+    try engine.run(allocator, io, &ctx, "design a calculator");
+
+    const final_path = try std.fmt.allocPrint(allocator, "{s}/gen_final.zig", .{workdir});
+    defer allocator.free(final_path);
+    try std.testing.expect(!fs.fileExists(final_path));
+    try std.testing.expect(ctx.deploys == 0);
+    try std.testing.expect(ctx.run_time_exceeded == 1);
+    // The cap hit is its own health-verdict clause, not a generic failure.
+    const kb = (try knowledge.load(allocator, ctx.kb_path.?)).?;
+    defer allocator.free(kb);
+    try std.testing.expect(std.mem.indexOf(u8, kb, "wall-time exceeded") != null);
+}
