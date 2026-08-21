@@ -123,3 +123,76 @@ pub fn injectPrompt(ctx: *types.Ctx, task: []const u8) ![]const u8 {
     }
     return try std.fmt.allocPrint(ctx.allocator, "Task: {s}", .{task});
 }
+
+/// Category counts over a knowledge-ledger text. Returned by `summarize`
+/// (pure, no IO) and rendered by `printStats`. Categories are prefix-based
+/// (`- <marker>:`), matching the line shapes written by `recordLesson`
+/// (`- <task>: deployed` / `- <task>: failed`), `recordCritic`
+/// (`- critic rejected`), `recordHealth` (`- health:`), and `recordBatch`
+/// (`- batch:`). `other` catches any non-matching lesson line.
+pub const Stats = struct {
+    total: usize,
+    deployed: usize,
+    failed: usize,
+    critic: usize,
+    health: usize,
+    batch: usize,
+    other: usize,
+    latest: []const u8,
+};
+
+/// Pure categorization of a ledger's text into `Stats`. No IO, so it is
+/// directly unit-testable. `latest` borrows the last non-empty line of
+/// `content` (caller keeps `content` alive while reading it).
+pub fn summarize(content: []const u8) Stats {
+    var s: Stats = .{ .total = 0, .deployed = 0, .failed = 0, .critic = 0, .health = 0, .batch = 0, .other = 0, .latest = "" };
+    var last: []const u8 = "";
+    var it = std.mem.splitScalar(u8, std.mem.trim(u8, content, &std.ascii.whitespace), '\n');
+    while (it.next()) |line| {
+        if (line.len == 0) continue;
+        last = line;
+        s.total += 1;
+        if (std.mem.startsWith(u8, line, "- critic rejected")) s.critic += 1
+        else if (std.mem.startsWith(u8, line, "- health:")) s.health += 1
+        else if (std.mem.startsWith(u8, line, "- batch:")) s.batch += 1
+        else if (std.mem.startsWith(u8, line, "- ") and std.mem.indexOf(u8, line, ": deployed") != null) s.deployed += 1
+        else if (std.mem.startsWith(u8, line, "- ") and std.mem.indexOf(u8, line, ": failed") != null) s.failed += 1
+        else s.other += 1;
+    }
+    s.latest = last;
+    return s;
+}
+
+/// Print a read-only summary of the configured knowledge ledger and return.
+/// Used by `--kb-stats`: an inspection surface for what the autonomous loop
+/// has actually learned, so a co-owner (or audit) can see the accumulated
+/// lessons without running the engine or reading raw ledger lines (§30/§24).
+/// With no `--kb` path, or when the ledger is absent/empty, reports that and
+/// exits cleanly — it is purely observational and never errors on a missing
+/// ledger.
+pub fn printStats(alloc: std.mem.Allocator, io: std.Io, kb_path: ?[]const u8, max_lines: ?usize) !void {
+    const kb = kb_path orelse {
+        types.logLine(io, "[kb-stats] no --kb ledger configured; nothing to summarize", .{});
+        return;
+    };
+    const raw = store.load(alloc, kb) catch |e| {
+        types.logLine(io, "[kb-stats] cannot read {s}: {s}", .{ kb, @errorName(e) });
+        return;
+    };
+    const content = raw orelse {
+        types.logLine(io, "[kb-stats] {s}: ledger empty (not yet written)", .{kb});
+        return;
+    };
+    defer alloc.free(content);
+    const s = summarize(content);
+    types.logLine(io, "[kb-stats] {s}", .{kb});
+    types.logLine(io, "  lessons:        {d}", .{s.total});
+    types.logLine(io, "  deployed:       {d}", .{s.deployed});
+    types.logLine(io, "  failed:         {d}", .{s.failed});
+    types.logLine(io, "  critic-rejected:{d}", .{s.critic});
+    types.logLine(io, "  health:         {d}", .{s.health});
+    types.logLine(io, "  batch:          {d}", .{s.batch});
+    types.logLine(io, "  other:          {d}", .{s.other});
+    if (max_lines) |m| types.logLine(io, "  cap (--kb-max-lines): {d}", .{m});
+    if (s.latest.len > 0) types.logLine(io, "  latest: {s}", .{s.latest});
+}
