@@ -1,5 +1,28 @@
 # Changelog
 
+## v0.6.0 (2026-08-21)
+Seventh tagged release. Batches three substantive changes merged to `master` since v0.5.1.
+- `feat(knowledge)`: the KB ledger now writes via `store.appendUnique` for the four
+  recorders (`recordLesson`/`recordCritic`/`recordHealth`/`recordBatch`), so a recurring
+  failure/critic/health lesson is recorded once instead of re-accumulated every run; under
+  `--kb-max-lines` the freed slot is spent on *distinct* lessons. No new flag; `store.save`
+  stays the plain-append primitive (tests use it directly). #38.
+- `fix(deploy)`: `deploy.run` reports a real checkpoint status (`!bool`) instead of swallowing
+  git results, and `engine.run` only counts `ctx.deploys` on a real commit — the loop now reads
+  its own deployment effectiveness honestly (§30). Two latent bugs fixed in the process: git was
+  spawned through `ctx.io` (`.failing` allocator) and the commit check only scanned stderr while
+  git prints `nothing to commit` to stdout. `ec2f8fa` (CI green).
+- `feat(observability)`: `--kb-stats` is a read-only inspector that loads the configured `--kb`
+  ledger, prints a category breakdown (total / deployed / failed / critic-rejected / health /
+  batch / other + latest line), and exits 0 without running the engine. With no `--kb` path or an
+  empty/absent ledger it prints a clear "nothing to summarize" line and still exits cleanly. The
+  categorization core (`knowledge.summarize`) is a pure function with direct unit tests. #40.
+- **Docs (§24):** README flag list + Safety section updated — `--kb-stats`, `--max-time`,
+  `--max-attempts` now documented, and the Safety section states the containment-boundary gap
+  (the critic denylist is a text fast-path, not a privilege boundary). Runtime sandboxing is a
+  deliberate design bet flagged for co-owner input: issue #41.
+Tagged from master `087921a` (CI green).
+
 ## v0.5.1 (2026-08-21)
 Sixth tagged release. Security patch on top of v0.5.0.
 - `fix(security)`: the critic's static safety denylist now matches dangerous constructs as **substrings** (`std.process`, `@cImport`, `@import("c")`, `asm`, `@export`) instead of exact tokens. An exact-token match was a real sandbox-escape bypass — indirection like `@field(std.process, "Child")` or `std.process.spawn` contains `std.process` but not the literal `std.process.Child`, so it passed the gate and reached the evaluator/deploy (CWE-265, #37). The mock backend's benign output never contains these substrings, so the green deploy path is unaffected. Behavior-preserving for legitimate code. Tagged from master `caa8c7f` (CI green).

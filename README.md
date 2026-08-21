@@ -19,11 +19,15 @@ runs fully offline for development and testing.
 
 Flags: `--mock|--openai|--local`, `--hitl|--no-hitl`, `--task TEXT`,
 `--tasks FILE` (multi-step plan, one task per line), `--out DIR`,
-`--expect TEXT`, `--max-tokens N`, `--max-steps N` (cap autonomous plan size), `--cache[=DIR]`, `--replay[=FILE]`,
-`--record[=FILE]`, `--kb[=DIR]`, `--kb-max-lines[=N]`, `--report[=FILE]`,
-`--health-hook CMD` (spawn `CMD <report>` after an unhealthy run, or always
-with `--always-hook`), `-V/--version` (print `yuxi <tag>` + exit 0).
-`yuxi --help` prints the authoritative, always-current list.
+`--expect TEXT`, `--max-tokens N`, `--max-steps N` (cap autonomous plan size),
+`--max-time N` (wall-clock autonomy cap, seconds), `--max-attempts N`
+(self-correction retry cap), `--cache[=DIR]`, `--replay[=FILE]`,
+`--record[=FILE]`, `--kb[=DIR]`, `--kb-max-lines[=N]`, `--kb-stats`
+(print a category breakdown of the `--kb` ledger and exit 0, no run),
+`--report[=FILE]`, `--health-hook CMD` (spawn `CMD <report>` after an
+unhealthy run, or always with `--always-hook`), `-V/--version` (print
+`yuxi <tag>` + exit 0). `yuxi --help` prints the authoritative, always-current
+list.
 Environment: `OPENAI_API_KEY` / `OPENAI_BASE`, `LOCAL_BASE`,
 `AE_TOKEN` (optional gateway auth token). The OpenAI/local backend shells out
 to `curl` (array argv, no shell) with bounded retry + timeouts — the bearer
@@ -78,6 +82,15 @@ Generated code is reviewed by the critic before it runs. A static denylist
 blocks arbitrary process spawn (`std.process.Child`) and native C interop
 (`@cImport`) so the engine never executes generated code that could shell out or
 link native. HITL mode gates every file write.
+
+**Containment boundary (open):** the denylist is a *text* fast-path, not a
+privilege boundary. An accepted step still compiles and runs as a native binary
+with the engine's full OS privileges, so it can use `std.fs`/`std.net` to read,
+tamper with, or exfiltrate files or open sockets. A real runtime sandbox
+(Linux landlock/seccomp syscall allowlist, or an external container/VM) is a
+deliberate design bet flagged for co-owner input — see issue #41. Until then,
+treat the engine as trusted-operator code and prefer HITL (`--hitl`) for
+untrusted task text.
 
 ## Repository invariants
 
