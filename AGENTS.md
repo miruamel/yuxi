@@ -570,5 +570,8 @@ Resolved (no longer open): issue #1 (gateway rate-limit no-op) — the dead
 per-call counter was removed in `dc7f217`; gateway now does auth + validation
 + PII redaction only. Closed as *remove* (option B).
 
+- `e48c290` docs(agents): record #33/#34/#35 in Recent-cycles, mark merged (#36).
+- `caa8c7f` fix(security): critic denylist matches dangerous substrings (`std.process`, `@cImport`, `@import("c")`, `asm`, `@export`) closing an indirection bypass (CWE-265) — exact-token match let `@field(std.process,"Child")`/`std.process.spawn` reach eval/deploy; mock path unaffected (#37, released v0.5.1).
+- `419a9e9` feat(knowledge): deduplicate identical lessons in the KB ledger via `store.appendUnique` (4 recorders switched); recurring failure/critic/health lines recorded once, distinct lessons preserved under `--kb-max-lines` (#38).
 Tracked for co-owner decision: issue #2 (--dry-run plan scope; --hitl gating scope).
 
