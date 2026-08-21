@@ -47,6 +47,28 @@ test "monitoring.assessHealth warns on a wall-clock cap hit" {
     try std.testing.expect(std.mem.indexOf(u8, hv.verdict, "wall-time exceeded") != null);
     try std.testing.expect(std.mem.indexOf(u8, hv.verdict, "no deploy") == null);
 }
+test "monitoring.assessHealth warns on a max-steps plan-cap abort" {
+    // The --max-steps abort is a distinct health signal (not a generic "no
+    // deploy"): a run whose decomposition was too large must surface
+    // "max-steps exceeded" so the KB steer and an external gate can see it.
+    // Regression: this clause had no direct test — the unhealthy-cycle test
+    // sets critic_rejections/mock_fallbacks/retries/token_budgets but never
+    // max_steps_exceeded, so the verdict branch was unexercised (same gap as
+    // run_time_exceeded, closed separately).
+    const allocator = std.heap.page_allocator;
+    const io = std.Io.Threaded.global_single_threaded.io();
+    const workdir = "/tmp/yuxi_maxsteps_test";
+
+    var ctx = try types.Ctx.init(allocator, io, .empty, .no_hitl, .mock, null, "", workdir);
+    ctx.deploys = 1;
+    ctx.max_steps_exceeded = 1;
+    const hv = try monitoring.assessHealth(&ctx);
+    defer if (hv.verdict.len > 0) allocator.free(hv.verdict);
+
+    try std.testing.expect(!hv.healthy);
+    try std.testing.expect(std.mem.indexOf(u8, hv.verdict, "max-steps exceeded") != null);
+    try std.testing.expect(std.mem.indexOf(u8, hv.verdict, "no deploy") == null);
+}
 
 test "monitoring.assessHealth is silent on a healthy cycle" {
     // A cycle that deployed real work (deploys >= 1, no fallbacks, no budget

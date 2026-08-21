@@ -125,6 +125,50 @@ test "main --version prints the build stamp and exits zero" {
     try std.testing.expect(std.mem.startsWith(u8, out, "yuxi v"));
 }
 
+test "main --kb-stats prints a ledger summary and exits zero" {
+    // Regression: the --kb-stats read-only inspector (main.zig:30-33) was
+    // reachable only via manual invocation — no test covered either of its two
+    // paths. The pure core (knowledge.summarize) was tested, but printStats'
+    // logLine formatting and the no-ledger short-circuit were unexercised, so
+    // a regression there shipped silently. Both paths are asserted here.
+    const a = std.heap.page_allocator;
+    var threaded = std.Io.Threaded.init(a, .{ .environ = std.Io.Threaded.global_single_threaded.environ.process_environ });
+    defer threaded.deinit();
+    const io = threaded.io();
+    const bin = "zig-out/bin/yuxi";
+
+    // No --kb: short-circuit, exit 0, and the summary line names the gap.
+    const none = try std.process.run(a, io, .{ .argv = &[_][]const u8{ bin, "--no-hitl", "--mock", "--kb-stats" } });
+    defer a.free(none.stdout);
+    defer a.free(none.stderr);
+    try std.testing.expect(none.term == .exited and none.term.exited == 0);
+    try std.testing.expect(std.mem.indexOf(u8, none.stdout, "no --kb ledger configured; nothing to summarize") != null);
+
+    // With a populated --kb ledger: exit 0 and the category counts are printed.
+    const kb = "/tmp/yuxi_kb_stats_cli.md";
+    const kb_content =
+        \\- add a feature: deployed (steps=1 deploys=1 retries=0 critic_rej=0 mock_fb=0 budget_ex=0 max_steps_ex=0 run_time_ex=0)
+        \\- fix a bug: failed (steps=2 deploys=0 retries=1 critic_rej=1 mock_fb=0 budget_ex=0 max_steps_ex=0 run_time_ex=0)
+        \\- critic rejected: missing error handling
+        \\- health: no deploy; self-correction exhausted; critic_rej=2
+        \\- batch: tasks=2 deploys=2 unhealthy=0
+        \\- some non-standard note line
+    ;
+    try fs.writeFileAlloc(a, kb, kb_content);
+    defer _ = std.Io.Dir.deleteFile(std.Io.Dir.cwd(), io, kb) catch {};
+    const got = try std.process.run(a, io, .{ .argv = &[_][]const u8{ bin, "--no-hitl", "--mock", "--kb-stats", "--kb", kb } });
+    defer a.free(got.stdout);
+    defer a.free(got.stderr);
+    try std.testing.expect(got.term == .exited and got.term.exited == 0);
+    try std.testing.expect(std.mem.indexOf(u8, got.stdout, "lessons:        6") != null);
+    try std.testing.expect(std.mem.indexOf(u8, got.stdout, "deployed:       1") != null);
+    try std.testing.expect(std.mem.indexOf(u8, got.stdout, "failed:         1") != null);
+    try std.testing.expect(std.mem.indexOf(u8, got.stdout, "critic-rejected:1") != null);
+    try std.testing.expect(std.mem.indexOf(u8, got.stdout, "health:         1") != null);
+    try std.testing.expect(std.mem.indexOf(u8, got.stdout, "batch:          1") != null);
+    try std.testing.expect(std.mem.indexOf(u8, got.stdout, "other:          1") != null);
+    try std.testing.expect(std.mem.indexOf(u8, got.stdout, "latest: - some non-standard note line") != null);
+}
 test "main --expect gates deploy end-to-end via the CLI flag" {
     // Regression guard (§21): the --expect behavioral-verification flag must
     // work through the real CLI path (main -> config.parse -> engine.newCtx ->
