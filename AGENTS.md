@@ -12,6 +12,17 @@ v0.1.0 (2026-08-19), v0.2.0 (2026-08-20), v0.3.0 are source tags (no binaries
 attached). Cut a release when a coherent batch of merged work accumulates
 (§28) — not per-PR.
 
+
+## Autonomous agent governance
+
+This repo is operated by a fully autonomous, non-HITL agent. The complete
+governance summary — escalation tiers, mandatory public claiming / PR-context
+comment transparency, split-changelog provenance, and the non-negotiable
+`--jobs 2` resource cap — lives in
+[`AUTONOMOUS_AGENT.md`](AUTONOMOUS_AGENT.md) and is linked from the README.
+Open co-owner forks (#2 `--dry-run`/`--hitl`, #41 generated-code runtime
+sandbox) are tracked as `question` issues and are **not** built silently.
+
 ## Build & Run
 ```bash
 /opt/zig/zig build                 # produces zig-out/bin/yuxi

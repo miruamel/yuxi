@@ -96,5 +96,5 @@ untrusted task text.
 
 ## Repository invariants
 
-≤5 files per directory, ≤200 SLOC per file, deep nesting by capability. See
+<=5 files per directory, <=200 SLOC per file, deep nesting by capability. See
 `DESIGN.md` for the layer sketch and `AGENTS.md` for agent-facing conventions.
