@@ -149,6 +149,25 @@ neither reached the ledger the way the two earlier autonomy caps did.
   operator can see it, but no test round-tripped it through the CLI. New
   assertion runs `--kb-stats --kb-max-lines=5` against the populated ledger
   and expects the `cap (--kb-max-lines): 5` line in stdout, exit 0.
+### `--record`/`--replay` loop completed with idempotent deploy fix (feat, reliability, §11/§12/§30)
+- The `--record` capture logic (plumbed in `transport.zig` but never activated) and the
+  `--replay`-compatible e2e tests (in `transport_test.zig` but never wired into
+  `build.zig`) were both present but dead — the record/replay loop could not
+  be exercised end-to-end. Wired both into the test suite via `build.zig`.
+- `deploy.run` treated "nothing added to commit but untracked files present" as
+  a failure instead of an idempotent re-run. When the same workdir is reused
+  for a record run (mock) followed by a replay run (openai), the second run's
+  engine execution writes fragment files (`gen_0/1/2.zig`) as untracked files
+  before `deploy.run` stages only `gen_final.zig`. Git then reports "nothing
+  added to commit but untracked files present" (exit 1), not the clean
+  "nothing to commit, working tree clean". Expanded the idempotent-detection
+  to match both phrases, so a record→replay sequence in the same workdir
+  correctly reports `deploys=1` for both runs.
+- Added `tsSuffix()` hermetic workdir generator to `transport_test.zig` (fixes
+  the documented test-hermeticity gotcha: stale `.git` in a fixed `/tmp` path
+  poisons the deploy commit). All 23 test roots pass (`zig build test -j2`).
+- Files: `build.zig`, `src/deploy/deploy.zig`, `src/llm/transport.zig`,
+  `src/llm/transport_test.zig`.
 ### Human / Other Contributions
 - (none this cycle)
 
