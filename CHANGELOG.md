@@ -168,6 +168,16 @@ neither reached the ledger the way the two earlier autonomy caps did.
   poisons the deploy commit). All 23 test roots pass (`zig build test -j2`).
 - Files: `build.zig`, `src/deploy/deploy.zig`, `src/llm/transport.zig`,
   `src/llm/transport_test.zig`.
+### `monitoring_test.zig` decomposed per §8 SLOC cap (refactor, §8/§17)
+- The 228-line test file exceeded the 200 SLOC hard invariant. Split into two
+  focused test modules under `src/monitoring/`:
+  - `health_test.zig` (90 lines): four `assessHealth` tests covering unhealthy
+    cycles, wall-clock cap, max-steps cap, and healthy cycles.
+  - `report_test.zig` (143 lines): three `writeReport` tests covering verdict
+    emission + JSON escaping, token/max-steps exposure, and KB stats
+    composition.
+- Removed `monitoring_test.zig`; updated `build.zig` test_files. All 24 test
+  roots pass, `zig fmt --check src` clean.
 ### Human / Other Contributions
 - (none this cycle)
 
