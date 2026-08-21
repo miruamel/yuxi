@@ -13,8 +13,8 @@
 
 ## Verification
 
-- [ ] `zig build` exit 0
-- [ ] `zig build test` exit 0 (concurrency capped at 2 cores)
+- [ ] `zig build -j2` exit 0
+- [ ] `zig build test -j2` exit 0 (concurrency capped at 2 cores)
 - [ ] `zig fmt --check src` exit 0
 
 <!-- All parallelizable steps above run with --jobs 2 / -j2 per the

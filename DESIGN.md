@@ -48,7 +48,7 @@ All HTTP backends use `curl` via `std.process.run`.
 ## Run
 
 ```bash
-/opt/zig/zig build                 # produces zig-out/bin/yuxi
+/opt/zig/zig build -j2                # produces zig-out/bin/yuxi (§8/§36: cap at 2 cores)
 ./zig-out/bin/yuxi --no-hitl --mock --task "write a function that adds two ints"
 ./zig-out/bin/yuxi --hitl   --local  --task "..."      # pauses for y/N before write
 ```

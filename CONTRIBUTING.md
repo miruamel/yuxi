@@ -27,10 +27,11 @@ mandatory transparency rules, and how to override or question a decision.
 
 Before a PR is mergeable:
 
-- `zig build` → exit 0
-- `zig build test` → exit 0, **concurrency capped at 2 cores**
-  (`taskset -c 0,1 /opt/zig/zig build test` locally; CI runs `zig build test`)
-- `zig fmt --check src` → exit 0
+- `/opt/zig/zig build -j2` → exit 0 (§8/§36: cap at 2 cores)
+- `/opt/zig/zig build test -j2` → exit 0, concurrency capped at 2 cores
+  (`taskset -c 0,1 /opt/zig/zig build test -j2` locally; CI runs
+  `zig build test -j2`)
+- `/opt/zig/zig fmt --check src` → exit 0 (serial)
 
 All parallelizable steps run with `--jobs 2` / `-j2` (or the tool-specific
 equivalent) per the non-negotiable resource invariant. Raising that limit

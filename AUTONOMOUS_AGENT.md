@@ -77,7 +77,7 @@ explicit architectural review and documented justification.
 
 - ≤5 files per directory, ≤200 SLOC per file, deep nesting by capability.
 - Dependency graph is a DAG — no cycles.
-- `zig build`, `zig build test` (all pass), `zig fmt --check src` clean,
+- `zig build -j2`, `zig build test -j2` (all pass), `zig fmt --check src` clean,
   no CRITICAL/HIGH security findings.
 
 ## How to override or question a decision

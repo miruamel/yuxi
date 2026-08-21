@@ -11,9 +11,9 @@ runs fully offline for development and testing.
 ## Build & Run
 
 ```bash
-/opt/zig/zig build                 # -> zig-out/bin/yuxi
-/opt/zig/zig build test            # unit + integration tests
-/opt/zig/zig fmt --check src       # formatting gate
+/opt/zig/zig build -j2                # -> zig-out/bin/yuxi (§8/§36: cap at 2 cores)
+/opt/zig/zig build test -j2           # unit + integration tests, -j2
+/opt/zig/zig fmt --check src          # formatting gate (serial)
 
 ./zig-out/bin/yuxi --no-hitl --mock --task "add two numbers"
 ./zig-out/bin/yuxi --hitl   --local --task "..."   # pauses y/N before each write
