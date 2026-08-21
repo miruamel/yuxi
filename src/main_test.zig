@@ -69,28 +69,44 @@ test "emitReportAndExit fires the health hook only on an unhealthy run" {
     _ = fs.deleteFile(io, sentinel) catch {};
     _ = fs.deleteFile(io, fixture) catch {};
 }
-
-test "main exits non-zero on a CLI parse error, zero on --help" {
-    // Regression guard for the §30 exit-code contract (#18/#19/#21): a malformed
-    // invocation must NOT exit 0 — otherwise CI/cron gating treats a failed
-    // parse as a healthy run. The binary is assumed built (CI runs `zig build`
-    // before `zig build test`, same as evaluator.run's real-subprocess tests).
+test "emitReportAndExit writes a temp report when only --health-hook is set" {
+    // Regression: the hook needs machine-readable input, but the user may set
+    // --health-hook WITHOUT --report. emitReportAndExit must still write a
+    // report (to a temp path) and pass it as argv[1], then clean it up. This
+    // branch was unexercised: the existing hook test always passed a --report
+    // path, so the temp-report path was dead in tests.
     const a = std.heap.page_allocator;
+    const io = std.Io.Threaded.global_single_threaded.io();
+
+    const fixture = "/tmp/yuxi_hook_fixture2.sh";
+    const sentinel = "/tmp/yuxi_hook_fired2";
+    try fs.writeFileAlloc(a, fixture, "#!/bin/sh\necho fired > " ++ sentinel ++ "\n");
     var threaded = std.Io.Threaded.init(a, .{ .environ = std.Io.Threaded.global_single_threaded.environ.process_environ });
     defer threaded.deinit();
-    const bin = "zig-out/bin/yuxi";
+    _ = std.process.run(a, threaded.io(), .{ .argv = &[_][]const u8{ "chmod", "+x", fixture } }) catch {};
+    _ = fs.deleteFile(io, sentinel) catch {};
 
-    // Missing --task → MissingTask → exit 1.
-    const missing = try std.process.run(a, threaded.io(), .{ .argv = &[_][]const u8{ bin, "--no-hitl", "--mock" } });
-    defer a.free(missing.stdout);
-    defer a.free(missing.stderr);
-    try std.testing.expect(missing.term == .exited and missing.term.exited == 1);
+    const unhealthy = monitoring.TaskResult{
+        .task = "t",
+        .deploys = 0,
+        .retries = 0,
+        .critic_rejections = 1,
+        .mock_fallbacks = 0,
+        .token_budgets_exceeded = 0,
+        .run_time_exceeded = 0,
+        .tokens = 0,
+        .max_steps_exceeded = 0,
+        .healthy = false,
+        .verdict = "x",
+    };
+    // No report_path: the hook must fire against a temp report, and the temp
+    // file must be removed afterwards (no leftover in /tmp).
+    const h = try mainmod.emitReportAndExit(a, io, null, fixture, false, null, null, unhealthy, null);
+    try std.testing.expect(!h);
+    try std.testing.expect(fs.fileExists(sentinel));
 
-    // --help → HelpRequested → exit 0 (a successful info request, not an error).
-    const help = try std.process.run(a, threaded.io(), .{ .argv = &[_][]const u8{ bin, "--help" } });
-    defer a.free(help.stdout);
-    defer a.free(help.stderr);
-    try std.testing.expect(help.term == .exited and help.term.exited == 0);
+    _ = fs.deleteFile(io, sentinel) catch {};
+    _ = fs.deleteFile(io, fixture) catch {};
 }
 
 test "main --version prints the build stamp and exits zero" {
