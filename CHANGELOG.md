@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.5.1 (2026-08-21)
+Sixth tagged release. Security patch on top of v0.5.0.
+- `fix(security)`: the critic's static safety denylist now matches dangerous constructs as **substrings** (`std.process`, `@cImport`, `@import("c")`, `asm`, `@export`) instead of exact tokens. An exact-token match was a real sandbox-escape bypass — indirection like `@field(std.process, "Child")` or `std.process.spawn` contains `std.process` but not the literal `std.process.Child`, so it passed the gate and reached the evaluator/deploy (CWE-265, #37). The mock backend's benign output never contains these substrings, so the green deploy path is unaffected. Behavior-preserving for legitimate code. Tagged from master `caa8c7f` (CI green).
+
 ## v0.5.0 (2026-08-21)
 Fifth tagged release. Batching 7 merged PRs (#29, #30, #31, #32, #33, #34, #35) since v0.4.0 —
 a security fix closing the gateway auth no-op (CWE-306, #35), the `--max-time` autonomy-safety
