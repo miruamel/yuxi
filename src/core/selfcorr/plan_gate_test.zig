@@ -3,7 +3,6 @@ const types = @import("types");
 const fs = @import("fs");
 const engine = @import("engine");
 const knowledge = @import("knowledge");
-const config = @import("config");
 
 // Injected backend: rejects the PLAN review call (distinguished from the
 // per-step code-critic call by the "Plan:" user-prompt prefix) so the engine

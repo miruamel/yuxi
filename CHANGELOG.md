@@ -35,6 +35,17 @@ neither reached the ledger the way the two earlier autonomy caps did.
   superseded by `recorders_test.zig` in `16daa1f`. Now points at the file
   that actually exists.
 
+### Governance docs + a dead import (fix, repo-hygiene, §24/§8)
+- `AGENTS.md` gained an `## Autonomous agent governance` section pointing at
+  `AUTONOMOUS_AGENT.md` (the README already linked it, but the agent-facing
+  entry point had no pointer). Open co-owner forks #2 and #41 are named as
+  not-built-silently.
+- `README.md` Repository invariants line still carried a literal `≤` — the
+  prior cycle's summary claimed it was replaced with `<=`, but the edit never
+  landed on disk. Now shell-safe.
+- `src/core/selfcorr/plan_gate_test.zig` imported `config` and never used it;
+  removed (Kilo Code Review nitpick). Build still green.
+
 ## v0.6.0 (2026-08-21)
 Seventh tagged release. Batches three substantive changes merged to `master` since v0.5.1.
 - `feat(knowledge)`: the KB ledger now writes via `store.appendUnique` for the four
