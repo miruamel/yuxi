@@ -22,6 +22,13 @@
   autonomy-safety bound only; it does not touch the reserved issue #2
   deploy-gating fork.
 
+### Run-lifecycle tail extracted to `core/runlife.zig` (refactor, §8 SLOC cap)
+- The `--max-time` feature pushed `engine.zig` to 229 SLOC, a §8 >200 breach.
+  `finishRun` + `flushRecord` (the LAYER 7-9 resilience/knowledge/monitoring
+  tail and record flush) moved into a new `core/runlife.zig` module, dropping
+  `engine.zig` to ~180 SLOC and keeping `core/` at 5 top-level files (§8 OK).
+  `engine.run` now calls `runlife.finishRun` / `runlife.flushRecord`;
+  `build.zig` registers the module in the all-to-all DAG. No behavior change.
 ### KB ledger now bounded on write (fix, reliability/perf, §8, PR #29)
 - `knowledge.save` appended lessons without limit while only `tailLessons`
   bounded what got injected into the next decomposition prompt. For a

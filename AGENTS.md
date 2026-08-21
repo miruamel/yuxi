@@ -515,6 +515,15 @@ never a bare `ctx.allocator.free(e)` that leaves a dangling pointer for a later
   `std.os.linux.clock_gettime` + `std.os.linux.timespec` (sec/nsec), which
   is fine since the repo already targets Linux (knowledge/fs use
   std.os.linux too).
+- `refactor(core)`: extract run-lifecycle tail (finishRun + flushRecord) into
+  `core/runlife.zig` (b6cda67). `--max-time` (#30) pushed engine.zig to 229
+  SLOC, a §8 >200 breach; moved the LAYER 7-9 resilience/knowledge/monitoring
+  tail + record flush out, dropping engine.zig to ~180 and keeping core/ at 5
+  top-level files (§8 OK). engine.run now calls runlife.finishRun /
+  runlife.flushRecord; build.zig registers `runlife` in the all-to-all DAG.
+  No behavior change. Lesson: after adding a feature, re-check the §8 SLOC
+  ceiling — a feature that fits today can push a file over 200 once combined
+  with prior edits; extract a cohesive subtree rather than splitting arbitrarily.
 
 
 
