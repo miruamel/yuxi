@@ -108,17 +108,18 @@ neither reached the ledger the way the two earlier autonomy caps did.
 - CI (`ci.yml`) already used `-j2`; the fix is purely documentation, no
   behavior change. `zig build -j2` and `zig build test -j2` both exit 0.
 
-### `--kb-stats` CLI path now covered end-to-end (test, §11/§21)
+### `--kb-stats` CLI path now covered end-to-end (test, §11/§21) [`3b716e0`]
 - `knowledge.printStats` (main.zig:30-33) had no test at all — only its pure core
   `knowledge.summarize` was covered, and its `logLine` formatting plus the
   no-ledger short-circuit were unexercised. New CLI-shell test asserts both
   paths: no `--kb` short-circuits with "nothing to summarize" and exit 0; a
-  populated ledger prints all six category counts, the latest line, and echoes
-  the `--kb-max-lines` cap it applied (knowledge.zig:192). The unreadable-ledger
-  path stays untested: `store.load` returns null for a missing file, so the
-  "ledger empty" branch is unreachable in the test sandbox — documented, not
-  chased. All 5 `main_test` roots pass.
-### `assessHealth` `max_steps_exceeded` clause covered (test, §11/§30)
+  populated ledger prints all six category counts and the latest line. The
+  unreadable-ledger path stays untested: `store.load` returns null for a missing
+  file, so the "ledger empty" branch is unreachable in the test sandbox —
+  documented, not chased. (The `--kb-max-lines` cap echo was NOT covered here;
+  that assertion landed in `7aa179f` after this entry was written.) All 5
+  `main_test` roots pass.
+### `assessHealth` `max_steps_exceeded` clause covered (test, §11/§30) [`f1a540a`]
 - The `--max-steps` abort verdict clause (monitoring.zig:174-178) had the same
   gap as the `run_time_exceeded` clause closed earlier: the unhealthy-cycle
   test sets critic_rejections/mock_fallbacks/retries/token_budgets but never
@@ -135,7 +136,7 @@ neither reached the ledger the way the two earlier autonomy caps did.
   The short-circuit now returns the parsed cap (bare form still defaults to
   200, matching `--cache`/`--report`/`--record`). New `--kb-max-lines=5`
   assertion in `main_test` covers the populated-ledger cap echo.
-### `emitReportAndExit` temp-report path covered (test, §11/§21)
+### `emitReportAndExit` temp-report path covered (test, §11/§21) [`b5a7d89`]
 - `main.emitReportAndExit` writes a temp report and passes it to the health hook
   when the caller sets `--health-hook` WITHOUT `--report`. The existing hook test
   always supplied a `--report` path, so that branch was dead in tests — a
@@ -143,7 +144,7 @@ neither reached the ledger the way the two earlier autonomy caps did.
   input. New test passes `report_path=null` + an unhealthy `TaskResult` and
   asserts the hook fires (sentinel written) and the temp report is cleaned up
   afterwards. All 4 `main_test` roots pass.
-### `--kb-stats` echoes the `--kb-max-lines` cap (test, §11/§21)
+### `--kb-stats` echoes the `--kb-max-lines` cap (test, §11/§21) [`7aa179f`]
 - `knowledge.printStats` logs the bound it applied (knowledge.zig:192) so an
   operator can see it, but no test round-tripped it through the CLI. New
   assertion runs `--kb-stats --kb-max-lines=5` against the populated ledger
