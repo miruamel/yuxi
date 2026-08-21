@@ -25,10 +25,9 @@ sandbox) are tracked as `question` issues and are **not** built silently.
 
 ## Build & Run
 ```bash
-/opt/zig/zig build                 # produces zig-out/bin/yuxi
-./zig-out/bin/yuxi --no-hitl --mock --task "write a function that adds two ints"
-./zig-out/bin/yuxi --hitl --local --task "..."   # --hitl reserved; engine auto-deploys on verified (see Open questions)
-- ./zig-out/bin/yuxi --no-hitl --mock --task "add two numbers" --expect "step result: 2+3=5"
+/opt/zig/zig build -j2                 # produces zig-out/bin/yuxi (§8/§36: cap at 2 cores)
+/opt/zig/zig build test -j2            # full suite, -j2
+/opt/zig/zig fmt --check src           # serial
 ```
 
 ## CLI flags
@@ -83,9 +82,9 @@ lives in `core/config/config.zig: printHelp`).
 
 ## Verify
 ```bash
-/opt/zig/zig build                  # compile binary
-/opt/zig/zig build test             # cache unit test
-/opt/zig/zig fmt --check src        # lint
+/opt/zig/zig build -j2                  # compile binary (§8/§36: cap at 2 cores)
+/opt/zig/zig build test -j2             # cache unit test, -j2
+/opt/zig/zig fmt --check src            # lint (serial)
 ```
 
 ## Architecture (`src/`)

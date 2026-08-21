@@ -64,8 +64,8 @@ Every build, test, lint, and static analysis command — locally and in CI —
 **must** cap parallelism at 2 cores:
 
 ```
-zig build            # serial; the pipeline is small
-zig build test -- --jobs 2
+zig build -j2
+zig build test -j2
 zig fmt --check src  # serial
 ```
 
