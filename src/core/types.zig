@@ -47,6 +47,10 @@ pub const Ctx = struct {
     /// dispatches here instead of the built-in mock/http — used by tests to
     /// script backend behavior (e.g. fail-then-succeed) without network.
     llm_fn: ?LlmFn,
+    /// Optional injected monotonic-clock reader (ns). When set, engine.run
+    /// uses it instead of `std.os.linux.clock_gettime` so the wall-clock cap
+    /// is testable deterministically (mirrors `llm_fn`). Null → live clock.
+    clock_ns: ?ClockNs,
     /// Optional path to a persisted knowledge base. When set, the engine
     /// records a per-run lesson here and the orchestrator prepends prior
     /// lessons to its decomposition prompt. Null (and a no-op) by default.
@@ -119,8 +123,9 @@ pub const Ctx = struct {
             .run_time_exceeded = 0,
             .token_budgets_exceeded = 0,
             .network_retries = 0,
-            .expected = null,
             .llm_fn = null,
+            .expected = null,
+            .clock_ns = null,
             .recorded = try std.ArrayList([]const u8).initCapacity(allocator, 0),
             .events = try std.ArrayList([]const u8).initCapacity(allocator, 0),
         };
@@ -148,6 +153,11 @@ pub const Ctx = struct {
 /// call shape so a test (or future real backend) can replace the built-in
 /// mock/http dispatch via Ctx.llm_fn.
 pub const LlmFn = *const fn (std.mem.Allocator, std.Io, *Ctx, []const u8, []const u8) anyerror![]u8;
+/// Injectable monotonic-clock reader, returning nanoseconds since an
+/// arbitrary epoch. Matches engine.run's call shape so a test can drive the
+/// `--max-time` cap deterministically (the real clock would make the cap
+/// non-deterministic). Null → live `std.os.linux.clock_gettime`.
+pub const ClockNs = *const fn () u64;
 
 pub fn logLine(io: std.Io, comptime fmt: []const u8, args: anytype) void {
     var buf: [2048]u8 = undefined;

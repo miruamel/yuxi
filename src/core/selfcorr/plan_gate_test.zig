@@ -141,3 +141,50 @@ test "engine.run bounds self-correction retries to --max-attempts" {
     defer allocator.free(final_path);
     try std.testing.expect(!fs.fileExists(final_path));
 }
+
+// Injectable fast clock for the --max-time in-loop cap regression test.
+// Advances past the configured cap on the third call: call 1 (start_ns) and
+// call 2 (pre-loop guard) stay at 0 so the pre-loop check passes, and call 3
+// (the per-attempt in-loop guard) trips the cap. This deterministically
+// exercises the in-loop path that a real slow evaluator.run would hit,
+// without sleeping. File-level static; reset at test start.
+var clock_fast_tick: usize = 0;
+fn clockFast() u64 {
+    clock_fast_tick += 1;
+    if (clock_fast_tick >= 3) return std.time.ns_per_s; // 1000ms
+    return 0;
+}
+
+test "engine.run aborts on --max-time from inside the attempt loop" {
+    // Regression for the in-loop wall-clock cap guard. The cap must be
+    // re-checked at the top of every attempt, not only once before the loop:
+    // a single slow build/eval must not slip past the operator's --max-time
+    // bound undetected. The fast clock makes the in-loop path deterministic
+    // (the pre-loop guard passes, the per-attempt guard trips).
+    clock_fast_tick = 0;
+    const allocator = std.heap.page_allocator;
+    const io = std.Io.Threaded.global_single_threaded.io();
+    const workdir = "/tmp/yuxi_maxtime_inloop_test";
+    std.Io.Dir.deleteTree(std.Io.Dir.cwd(), io, workdir) catch {};
+    try fs.ensureDir(allocator, workdir);
+
+    var ctx = try types.Ctx.init(allocator, io, .empty, .no_hitl, .mock, null, "", workdir);
+    ctx.kb_path = "/tmp/yuxi_maxtime_inloop_test/kb.md";
+    ctx.llm_fn = llmFailEval;
+    ctx.clock_ns = clockFast;
+    // 100ms cap: pre-loop guard passes (elapsed 0), per-attempt guard trips
+    // on the third tick (1000ms > 100ms) — before any buildstep.build runs.
+    ctx.max_time_ms = 100;
+    try engine.run(allocator, io, &ctx, "write a panicking main");
+
+    // Aborted from inside the loop: no build, no artifact, no deploy.
+    const final_path = try std.fmt.allocPrint(allocator, "{s}/gen_final.zig", .{workdir});
+    defer allocator.free(final_path);
+    try std.testing.expect(!fs.fileExists(final_path));
+    try std.testing.expect(ctx.deploys == 0);
+    try std.testing.expect(ctx.run_time_exceeded == 1);
+    // Distinct from a generic failure: the cap hit is its own clause.
+    const kb = (try knowledge.load(allocator, ctx.kb_path.?)).?;
+    defer allocator.free(kb);
+    try std.testing.expect(std.mem.indexOf(u8, kb, "wall-time exceeded") != null);
+}
