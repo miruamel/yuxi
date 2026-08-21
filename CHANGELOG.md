@@ -7,6 +7,21 @@ the `--kb` feature shipped in v0.1.0 and the `--max-time` cap in v0.5.0, but
 neither reached the ledger the way the two earlier autonomy caps did.
 
 ### 🤖 Autonomous Agent Contributions
+### `--max-time` cap now checked inside the attempt loop (fix, autonomy safety, §11/§14)
+- `--max-time N` was documented as capping wall-clock per run, but `engine.run`
+  only checked the cap once *before* the self-correction attempt loop — a single
+  slow `evaluator.run` could blow past the bound undetected. The check now runs
+  at the top of every attempt through a shared `wallClockExceeded(ctx, start_ns)`
+  helper, so the cap bounds the whole loop, not just the pre-codegen gap.
+- The helper prefers an injected `ctx.clock_ns` over the live
+  `std.os.linux.clock_gettime`, mirroring the `llm_fn` seam, so the in-loop
+  path is deterministically testable instead of requiring a sleep.
+- New regression test in `plan_gate_test.zig`: a fast fake clock (0, 0, then
+  `ns_per_s`) trips the per-attempt guard on the third tick while the pre-loop
+  guard passes — proving the cap aborts before any `buildstep` or `evaluator.run`.
+  All 4 `plan_gate` tests pass; full suite green (`zig build test -j2`, 11 roots).
+- Files: `src/core/types.zig` (`Ctx.clock_ns` + `ClockNs`), `src/core/engine.zig`
+  (per-attempt guard), `src/core/selfcorr/plan_gate_test.zig` (regression test).
 ### `--kb` was a silent no-op on a single `--task` run (fix, reliability, §11/§12)
 - `engine.newCtx` threaded `kb_max_lines`, `replay_path`, and `record_path`
   through to the `Ctx`, but **not `kb_path`** — so `ctx.kb_path` stayed `null`
