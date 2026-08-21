@@ -152,12 +152,7 @@ pub fn summarize(content: []const u8) Stats {
         if (line.len == 0) continue;
         last = line;
         s.total += 1;
-        if (std.mem.startsWith(u8, line, "- critic rejected")) s.critic += 1
-        else if (std.mem.startsWith(u8, line, "- health:")) s.health += 1
-        else if (std.mem.startsWith(u8, line, "- batch:")) s.batch += 1
-        else if (std.mem.startsWith(u8, line, "- ") and std.mem.indexOf(u8, line, ": deployed") != null) s.deployed += 1
-        else if (std.mem.startsWith(u8, line, "- ") and std.mem.indexOf(u8, line, ": failed") != null) s.failed += 1
-        else s.other += 1;
+        if (std.mem.startsWith(u8, line, "- critic rejected")) s.critic += 1 else if (std.mem.startsWith(u8, line, "- health:")) s.health += 1 else if (std.mem.startsWith(u8, line, "- batch:")) s.batch += 1 else if (std.mem.startsWith(u8, line, "- ") and std.mem.indexOf(u8, line, ": deployed") != null) s.deployed += 1 else if (std.mem.startsWith(u8, line, "- ") and std.mem.indexOf(u8, line, ": failed") != null) s.failed += 1 else s.other += 1;
     }
     s.latest = last;
     return s;
