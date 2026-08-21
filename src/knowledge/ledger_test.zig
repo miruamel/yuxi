@@ -153,8 +153,38 @@ test "knowledge recordBatch persists the batch summary to the KB" {
     const path = try std.fmt.allocPrint(alloc, "{s}/kb.md", .{base});
     defer alloc.free(path);
     defer std.Io.Dir.deleteTree(std.Io.Dir.cwd(), io, base) catch {};
-    try knowledge.recordBatch(alloc, path, "tasks=2 deploys=2 unhealthy=0");
+    try knowledge.recordBatch(alloc, path, "tasks=2 deploys=2 unhealthy=0", null);
     const got = (try knowledge.load(alloc, path)).?;
     defer alloc.free(got);
     try std.testing.expect(std.mem.indexOf(u8, got, "- batch: tasks=2 deploys=2 unhealthy=0") != null);
+}
+
+test "knowledge recordBatch honors kb_max_lines bound" {
+    // Regression: the batch summary path must respect --kb-max-lines, exactly
+    // like recordLesson/recordHealth, or a long-running --tasks engine grows
+    // the ledger without limit despite the operator setting a cap (reopens the
+    // unbounded-growth hole PR #29 closed for the per-run paths).
+    const alloc = std.testing.allocator;
+    const io = std.Io.Threaded.global_single_threaded.io();
+    const base = "/tmp/yuxi_kb_batch_bounded_test";
+    const path = try std.fmt.allocPrint(alloc, "{s}/kb.md", .{base});
+    defer alloc.free(path);
+    defer std.Io.Dir.deleteTree(std.Io.Dir.cwd(), io, base) catch {};
+    try knowledge.recordBatch(alloc, path, "tasks=1 deploys=1 unhealthy=0", 2);
+    try knowledge.recordBatch(alloc, path, "tasks=2 deploys=2 unhealthy=0", 2);
+    try knowledge.recordBatch(alloc, path, "tasks=3 deploys=3 unhealthy=0", 2);
+    try knowledge.recordBatch(alloc, path, "tasks=4 deploys=4 unhealthy=0", 2);
+    try knowledge.recordBatch(alloc, path, "tasks=5 deploys=5 unhealthy=0", 2);
+    const got = (try knowledge.load(alloc, path)).?;
+    defer alloc.free(got);
+    // Only the last two batch lines survive the bound.
+    try std.testing.expect(std.mem.indexOf(u8, got, "tasks=1 ") == null);
+    try std.testing.expect(std.mem.indexOf(u8, got, "tasks=2 ") == null);
+    try std.testing.expect(std.mem.indexOf(u8, got, "tasks=4 ") != null);
+    try std.testing.expect(std.mem.indexOf(u8, got, "tasks=5 ") != null);
+    var lines: usize = 0;
+    for (got) |c| {
+        if (c == '\n') lines += 1;
+    }
+    try std.testing.expectEqual(@as(usize, 2), lines);
 }
