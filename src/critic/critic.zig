@@ -8,8 +8,18 @@ pub const Verdict = struct {
 };
 
 const deny_list = [_][]const u8{
-    "std.process.Child",
-    "@cImport(",
+    // Exact-prefix matches for native-exec / C-interop surface. Substrings
+    // (not exact tokens) so indirection like `@field(std.process, "Child")`
+    // or `std.process.spawn` — which contains "std.process" but not the
+    // exact token "std.process.Child" — is still blocked. None of these
+    // appear in the mock backend's benign step output, so the green deploy
+    // path is unaffected; they only ever show up in generated code that is
+    // trying to escape the sandbox.
+    "std.process",
+    "@cImport",
+    "@import(\"c\")",
+    "asm",
+    "@export",
 };
 /// Return an owned reason if `code` contains a construct that must never run
 /// (arbitrary process spawn or native C interop). Null otherwise.
@@ -110,13 +120,36 @@ test "critic fast-path blocks dangerous constructs" {
     const allocator = std.heap.page_allocator;
     const io = std.Io.Threaded.global_single_threaded.io();
     var ctx = try types.Ctx.init(allocator, io, .empty, .no_hitl, .mock, null, "", "ae_out");
+    // Exact form still blocked (now via the broader "std.process" substring).
     const v = try run(&ctx, "pub fn step0() void { const c = std.process.Child.init(&.{\"sh\"}, .{}); }");
     try std.testing.expect(!v.ok);
     try std.testing.expect(v.reason != null);
-    try std.testing.expect(std.mem.indexOf(u8, v.reason.?, "std.process.Child") != null);
+    try std.testing.expect(std.mem.indexOf(u8, v.reason.?, "std.process") != null);
     allocator.free(v.reason.?);
+    // C-interop via @cImport still blocked.
     const v2 = try run(&ctx, "pub fn step1() void { const x = @cImport({ @cInclude(\"x.h\"); }); }");
     try std.testing.expect(!v2.ok);
     try std.testing.expect(std.mem.indexOf(u8, v2.reason.?, "@cImport") != null);
     allocator.free(v2.reason.?);
+    // Indirection MUST also be blocked: "@field(std.process, \"Child\")"
+    // contains "std.process" but NOT the exact token "std.process.Child".
+    // This is the bypass the broader denylist closes (the prior exact-token
+    // match let it through to the evaluator/deploy).
+    const v3 = try run(&ctx, "pub fn step2() void { const P = @field(std.process, \"Child\"); _ = P; }");
+    try std.testing.expect(!v3.ok);
+    try std.testing.expect(std.mem.indexOf(u8, v3.reason.?, "std.process") != null);
+    allocator.free(v3.reason.?);
+    // spawn() is on the same namespace; must be blocked even without ".Child".
+    const v4 = try run(&ctx, "pub fn step3() void { _ = std.process.spawn; }");
+    try std.testing.expect(!v4.ok);
+    try std.testing.expect(std.mem.indexOf(u8, v4.reason.?, "std.process") != null);
+    allocator.free(v4.reason.?);
+    // Inline assembly and symbol export are out of scope for a generated step; blocked.
+    const v5 = try run(&ctx, "pub fn step4() void { asm volatile (\"nop\"); }");
+    try std.testing.expect(!v5.ok);
+    try std.testing.expect(std.mem.indexOf(u8, v5.reason.?, "asm") != null);
+    allocator.free(v5.reason.?);
+    const v6 = try run(&ctx, "pub fn step5() void { @export(std.process, .{ .name = \"x\" }); }");
+    try std.testing.expect(!v6.ok);
+    allocator.free(v6.reason.?);
 }
