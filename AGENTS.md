@@ -555,8 +555,9 @@ never a bare `ctx.allocator.free(e)` that leaves a dangling pointer for a later
   attempt, no deploy). Off by default. Smoke-confirmed: `attempt 1/1` with the
   flag, `attempt 1/3` without.
 - `fix`: `--tasks` batch KB ledger honors `--kb-max-lines` (a13d322, #32). `recordBatch` ignored the operator's cap (called `store.save(.., null)`) while its per-run siblings threaded `kb_max_lines` — a long-running `--tasks` engine set to a cap still grew the ledger unbounded on the batch path, reopening the #29 hole. Wired `cfg.kb_max_lines` through `loop.runTasks`; added a regression test (ledger_test 9/9). CI green, merged squash.
-- `feat(observability)`: `--report` JSON now exposes `tokens` (real LLM spend) and `max_steps_exceeded` (plan-cap aborts) as structured fields in `TaskResult`, alongside the existing counters. An external CI gate can now read cost + plan-cap signals without parsing logs (closes a §30 visibility gap the report had since it was added). Behavior-preserving; `monitoring_test` regression asserts both fields. Not yet released (§28).
-- `test(§21)`: `--expect` now has a true end-to-end CLI test — `main_test` shells the built binary with `--expect "step result: 2+3=5"` (exit 0, verified deploy) and `--expect "nope"` (exit 1, retries exhausted) — proving the flag works through `main -> config.parse -> engine.newCtx -> evaluator.run`, not just the `evaluator.run` unit test. Closes the coverage gap flagged this cycle. Not yet released (§28).
+- `feat(observability)`: `--report` JSON exposes `tokens` + `max_steps_exceeded` (39a36e8, #33). Merged, not yet tagged (§28).
+- `test(§21)`: `--expect` end-to-end CLI test in `main_test` shells the built binary (3e1a6a1, #34). Merged, not yet tagged (§28).
+- `fix(security)`: gateway now enforces a real auth secret — `AE_TOKEN_EXPECTED=<secret>` makes `AE_TOKEN` must-match (constant-time, fail-closed), closing CWE-306/CWE-287 (e3a532d, #35). Legacy behavior preserved when `AE_TOKEN_EXPECTED` is unset, so dev/offline runs + all existing tests are unchanged. The engine still does NOT gate its own deploys (issue #2 reserved for co-owner). `gateway_test` adds 3 cases (mismatch/missing reject, correct admit). Merged, not yet tagged (§28).
 
 
 
