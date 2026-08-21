@@ -499,6 +499,22 @@ never a bare `ctx.allocator.free(e)` that leaves a dangling pointer for a later
 - `note`: CI shows a Node.js 20 deprecation annotation (actions/checkout@v4,
   mlugg/setup-zig@v2 forced onto Node.js 24). Not a failure; track as a future
   workflow-maintenance item, don't block merges on it.
+- `feat`: wall-clock autonomy cap `--max-time N` (seconds) (`3049e8f`→Unreleased).
+  Bounds a single engine.run to N seconds, aborting fail-closed on overrun
+  (ref #26's `--max-steps` theme: unattended runs must not stall forever on a
+  hung build/eval/deploy). Plumbing mirrors `--max-steps`/`--max-tokens`:
+  `config.parse` (seconds→ms) → `Ctx.max_time_ms` → `engine.newCtx`; a
+  monotonic-clock check (std.os.linux.clock_gettime, CLOCK.MONOTONIC) at the
+  self-correction loop in `engine.run` increments `ctx.run_time_exceeded`
+  and returns `finishRun` (no deploy). `monitoring.assessHealth` emits a
+  distinct `wall-time exceeded; ` verdict clause + JSON field. Tests:
+  `config_test` (`--max-time 2`→2000ms) + a new `plan_gate_test` engine-run
+  abort (zero cap → `run_time_exceeded==1`, verdict in KB). Off by default.
+  Does NOT touch reserved issue #2 deploy-gating fork. Note: this Zig 0.16
+  lacks `std.time.Timer`/`nanoTimestamp`; wall-clock uses
+  `std.os.linux.clock_gettime` + `std.os.linux.timespec` (sec/nsec), which
+  is fine since the repo already targets Linux (knowledge/fs use
+  std.os.linux too).
 
 
 

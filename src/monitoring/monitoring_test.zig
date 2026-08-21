@@ -59,6 +59,7 @@ test "monitoring.writeReport emits verdict + escapes it" {
         .critic_rejections = 1,
         .mock_fallbacks = 0,
         .token_budgets_exceeded = 0,
+        .run_time_exceeded = 0,
         .healthy = false,
         .verdict = "quote\" inside",
     };
@@ -80,7 +81,7 @@ test "monitoring.writeReport emits verdict + escapes it" {
 
     const batch = [_]monitoring.TaskResult{
         single,
-        .{ .task = "ok task", .deploys = 1, .retries = 0, .critic_rejections = 0, .mock_fallbacks = 0, .token_budgets_exceeded = 0, .healthy = true, .verdict = "" },
+        .{ .task = "ok task", .deploys = 1, .retries = 0, .critic_rejections = 0, .mock_fallbacks = 0, .token_budgets_exceeded = 0, .run_time_exceeded = 0, .healthy = true, .verdict = "" },
     };
     try monitoring.writeReport(allocator, io, path, "v0.3.0-test", null, &batch);
     const got2 = try fs.readFileAlloc(allocator, path);

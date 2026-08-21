@@ -91,3 +91,16 @@ test "config --max-steps is parsed into the plan cap" {
     const cfg = try parseArgs(std.testing.allocator, io, &argv);
     try std.testing.expectEqual(@as(usize, 4), cfg.max_steps.?);
 }
+
+test "config --max-time is parsed into the wall-clock cap (seconds -> ms)" {
+    const io = testIo();
+    // --max-time 2 must yield a 2000 ms cap (seconds -> ms), not silently
+    // ignored. This guards the parse + unit-conversion side of the contract.
+    const argv = [_][]const u8{ "./yuxi", "--max-time", "2", "--mock", "--task", "t" };
+    const cfg = try parseArgs(std.testing.allocator, io, &argv);
+    try std.testing.expectEqual(@as(usize, 2000), cfg.max_time_ms.?);
+    // Off by default.
+    const off = [_][]const u8{ "./yuxi", "--mock", "--task", "t" };
+    const c2 = try parseArgs(std.testing.allocator, io, &off);
+    try std.testing.expect(c2.max_time_ms == null);
+}

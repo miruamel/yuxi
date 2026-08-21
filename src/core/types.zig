@@ -25,6 +25,11 @@ pub const Ctx = struct {
     tokens: usize,
     max_tokens: ?usize,
     max_steps: ?usize = null,
+    /// Optional wall-clock cap (milliseconds) for one engine.run. When set,
+    /// the run aborts fail-closed after this long (a hung build/eval/deploy
+    /// must not run unattended forever). Null (off) by default. Mirrors the
+    /// other autonomy-safety caps (`--max-steps`, `--max-tokens`).
+    max_time_ms: ?usize = null,
     cache: ?*cache_mod.Cache,
     eval_error: ?[]const u8,
     /// Optional caller-supplied expected stdout (trimmed) for behavioral
@@ -72,6 +77,12 @@ pub const Ctx = struct {
     /// own health-verdict clause so a deliberate fail-closed safety cap is not
     /// misread as a generic unhealthy cycle.
     max_steps_exceeded: usize = 0,
+    /// Set when engine.run aborts because the wall-clock cap `--max-time` was
+    /// exceeded. Distinct from a generic failure (which leaves this at 0);
+    /// surfaced as its own health-verdict clause so a deliberate fail-closed
+    /// safety cap is not misread as a generic unhealthy cycle (matches
+    /// `max_steps_exceeded` / `token_budgets_exceeded`).
+    run_time_exceeded: usize = 0,
     /// Set when the build aborts because the accumulated token spend crossed
     /// `--max-tokens`. Distinct from a generic failed build (which leaves this
     /// at 0); surfaced as its own health-verdict clause.
@@ -99,6 +110,7 @@ pub const Ctx = struct {
             .retries = 0,
             .deploys = 0,
             .max_steps_exceeded = 0,
+            .run_time_exceeded = 0,
             .token_budgets_exceeded = 0,
             .network_retries = 0,
             .expected = null,

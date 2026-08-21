@@ -6,7 +6,7 @@ const fs = @import("fs");
 /// log, so the loop can read its own effectiveness at a glance. Purely
 /// diagnostic — never alters the pipeline.
 pub fn report(ctx: *types.Ctx) void {
-    ctx.log("[monitoring] metrics deploys={d} retries={d} critic_rejections={d} mock_fallbacks={d} network_retries={d} token_budgets_exceeded={d} tokens={d}", .{ ctx.deploys, ctx.retries, ctx.critic_rejections, ctx.mock_fallbacks, ctx.network_retries, ctx.token_budgets_exceeded, ctx.tokens });
+    ctx.log("[monitoring] metrics deploys={d} retries={d} critic_rejections={d} mock_fallbacks={d} network_retries={d} token_budgets_exceeded={d} run_time_exceeded={d} tokens={d}", .{ ctx.deploys, ctx.retries, ctx.critic_rejections, ctx.mock_fallbacks, ctx.network_retries, ctx.token_budgets_exceeded, ctx.run_time_exceeded, ctx.tokens });
     ctx.record("monitoring: metrics logged");
 }
 
@@ -37,6 +37,7 @@ pub const TaskResult = struct {
     critic_rejections: usize,
     mock_fallbacks: usize,
     token_budgets_exceeded: usize,
+    run_time_exceeded: usize,
     healthy: bool,
     /// Machine-readable reason the run is unhealthy (empty when healthy).
     /// Owned by the holder of the TaskResult (free alongside the other fields).
@@ -62,6 +63,7 @@ pub fn taskResult(alloc: std.mem.Allocator, task: []const u8, ctx: *types.Ctx, h
         .critic_rejections = ctx.critic_rejections,
         .mock_fallbacks = ctx.mock_fallbacks,
         .token_budgets_exceeded = ctx.token_budgets_exceeded,
+        .run_time_exceeded = ctx.run_time_exceeded,
         .healthy = hv.healthy,
         .verdict = vdup,
     };
@@ -140,8 +142,8 @@ fn appendResult(alloc: std.mem.Allocator, buf: *std.ArrayList(u8), r: TaskResult
     defer alloc.free(esc_task);
     const esc_verdict = try escapeJson(alloc, r.verdict);
     defer alloc.free(esc_verdict);
-    const obj = try std.fmt.allocPrint(alloc, "{{\"task\":\"{s}\",\"deploys\":{d},\"retries\":{d},\"critic_rejections\":{d},\"mock_fallbacks\":{d},\"token_budgets_exceeded\":{d},\"healthy\":{s},\"verdict\":\"{s}\"}}", .{
-        esc_task, r.deploys, r.retries, r.critic_rejections, r.mock_fallbacks, r.token_budgets_exceeded, if (r.healthy) "true" else "false", esc_verdict,
+    const obj = try std.fmt.allocPrint(alloc, "{{\"task\":\"{s}\",\"deploys\":{d},\"retries\":{d},\"critic_rejections\":{d},\"mock_fallbacks\":{d},\"token_budgets_exceeded\":{d},\"run_time_exceeded\":{d},\"healthy\":{s},\"verdict\":\"{s}\"}}", .{
+        esc_task, r.deploys, r.retries, r.critic_rejections, r.mock_fallbacks, r.token_budgets_exceeded, r.run_time_exceeded, if (r.healthy) "true" else "false", esc_verdict,
     });
     defer alloc.free(obj);
     try buf.appendSlice(alloc, obj);
@@ -166,6 +168,11 @@ pub fn assessHealth(ctx: *types.Ctx) !HealthVerdict {
         ctx.log("[monitoring][health] WARN plan exceeded --max-steps {d} time(s); decomposition aborted", .{ctx.max_steps_exceeded});
         ctx.record("monitoring: health WARN plan exceeded max-steps");
         verdict.appendSlice(ctx.allocator, "max-steps exceeded; ") catch {};
+    }
+    if (ctx.run_time_exceeded > 0) {
+        ctx.log("[monitoring][health] WARN wall-clock cap --max-time exceeded {d} time(s); run aborted", .{ctx.run_time_exceeded});
+        ctx.record("monitoring: health WARN wall-clock cap exceeded");
+        verdict.appendSlice(ctx.allocator, "wall-time exceeded; ") catch {};
     }
     if (ctx.retries > 0 and ctx.deploys == 0) {
         ctx.log("[monitoring][health] WARN self-correction exhausted without a deploy", .{});
