@@ -1,5 +1,40 @@
 # Changelog
 
+## Unreleased
+Fixes for the knowledge-base learning loop, which was broken on the primary
+`--task` path and blind to the wall-clock cap. Both regressions were latent:
+the `--kb` feature shipped in v0.1.0 and the `--max-time` cap in v0.5.0, but
+neither reached the ledger the way the two earlier autonomy caps did.
+
+### `--kb` was a silent no-op on a single `--task` run (fix, reliability, §11/§12)
+- `engine.newCtx` threaded `kb_max_lines`, `replay_path`, and `record_path`
+  through to the `Ctx`, but **not `kb_path`** — so `ctx.kb_path` stayed `null`
+  and every site guarded by it (`recordLesson`, `recordHealth`, `injectPrompt`)
+  was a no-op. The headline KB feature was dead on the primary CLI path: only
+  `--tasks` ever wrote a ledger, because `loop.runTasks` calls `recordBatch`
+  directly with `cfg.kb_path` instead of going through the `Ctx`. The
+  recently-added `--kb-stats` inspector (#40) read a ledger that single-run
+  users could never populate.
+- `newCtx` now sets `ctx.kb_path = cfg.kb_path`, so a single `--task` run
+  persists its lesson, receives prior lessons in its decomposition prompt, and
+  lets `--kb-stats` summarize a real ledger. No flag or schema change; the
+  `--tasks` path is unaffected (it still calls `recordBatch` directly).
+
+### `recordLesson` now persists the `--max-time` cap hit (fix, learn-loop, §12)
+- `run_time_exceeded` was surfaced everywhere except the KB: `assessHealth`,
+  `monitoring.report`, and `TaskResult` all emitted the `wall-time exceeded;`
+  verdict clause and counter, but `recordLesson` never wrote `run_time_ex` —
+  so a wall-clock-cap abort was visible in health and invisible in the
+  ledger, and the next cycle's `injectPrompt` never steered away from it.
+- Mirrors the `max_steps_ex`/`token_budgets_exceeded` persistence fixes
+  (#27/#28): both `recordLesson` lesson formats now append
+  `run_time_ex={d}`. `knowledge.recorders_test` asserts it.
+
+### Stale doc pointer corrected (fix, repo-hygiene, §24)
+- `AGENTS.md` named `ledger_test` as a live test file; that module was
+  superseded by `recorders_test.zig` in `16daa1f`. Now points at the file
+  that actually exists.
+
 ## v0.6.0 (2026-08-21)
 Seventh tagged release. Batches three substantive changes merged to `master` since v0.5.1.
 - `feat(knowledge)`: the KB ledger now writes via `store.appendUnique` for the four

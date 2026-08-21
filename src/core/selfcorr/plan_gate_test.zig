@@ -3,6 +3,7 @@ const types = @import("types");
 const fs = @import("fs");
 const engine = @import("engine");
 const knowledge = @import("knowledge");
+const config = @import("config");
 
 // Injected backend: rejects the PLAN review call (distinguished from the
 // per-step code-critic call by the "Plan:" user-prompt prefix) so the engine
@@ -137,6 +138,7 @@ test "engine.run bounds self-correction retries to --max-attempts" {
     // failed-evaluation follow-up (0 since attempt+1 < max_attempts is false).
     try std.testing.expect(ctx.deploys == 0);
     const final_path = try std.fmt.allocPrint(allocator, "{s}/gen_final.zig", .{workdir});
+
     defer allocator.free(final_path);
     try std.testing.expect(!fs.fileExists(final_path));
 }

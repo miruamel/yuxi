@@ -324,7 +324,7 @@ Gotchas paid for this cycle:
   assume global `user.name/email` exists.
 - **Test hermeticity: never reuse a fixed `/tmp` workdir across runs.** Engine
   tests that checkpoint into git (`deploy.run`, `recovery_test`, `plan_gate_test`,
-  `ledger_test`) use fixed `/tmp/yuxi_*` dirs. A leftover `.git` from an
+  `recorders_test`) use fixed `/tmp/yuxi_*` dirs. A leftover `.git` from an
   assistant's earlier direct binary run collides with the test's `git init` /
   commit and yields cryptic `error: invalid object 100644 ... for 'gen_final.zig'`
   — a false FAIL that looks like a product bug. Either `deleteTree` the dir at the
