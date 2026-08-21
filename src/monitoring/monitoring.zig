@@ -38,6 +38,12 @@ pub const TaskResult = struct {
     mock_fallbacks: usize,
     token_budgets_exceeded: usize,
     run_time_exceeded: usize,
+    /// Real LLM token spend this run (chars/4 + chars/8 + 16). Lets a gate see
+    /// actual cost, not just the `token_budgets_exceeded` counter.
+    tokens: usize,
+    /// Times the plan hit --max-steps and decomposition was aborted. A distinct
+    /// health signal (set in orchestrator), exposed so a gate can branch on *why*.
+    max_steps_exceeded: usize,
     healthy: bool,
     /// Machine-readable reason the run is unhealthy (empty when healthy).
     /// Owned by the holder of the TaskResult (free alongside the other fields).
@@ -64,6 +70,8 @@ pub fn taskResult(alloc: std.mem.Allocator, task: []const u8, ctx: *types.Ctx, h
         .mock_fallbacks = ctx.mock_fallbacks,
         .token_budgets_exceeded = ctx.token_budgets_exceeded,
         .run_time_exceeded = ctx.run_time_exceeded,
+        .tokens = ctx.tokens,
+        .max_steps_exceeded = ctx.max_steps_exceeded,
         .healthy = hv.healthy,
         .verdict = vdup,
     };
@@ -142,8 +150,8 @@ fn appendResult(alloc: std.mem.Allocator, buf: *std.ArrayList(u8), r: TaskResult
     defer alloc.free(esc_task);
     const esc_verdict = try escapeJson(alloc, r.verdict);
     defer alloc.free(esc_verdict);
-    const obj = try std.fmt.allocPrint(alloc, "{{\"task\":\"{s}\",\"deploys\":{d},\"retries\":{d},\"critic_rejections\":{d},\"mock_fallbacks\":{d},\"token_budgets_exceeded\":{d},\"run_time_exceeded\":{d},\"healthy\":{s},\"verdict\":\"{s}\"}}", .{
-        esc_task, r.deploys, r.retries, r.critic_rejections, r.mock_fallbacks, r.token_budgets_exceeded, r.run_time_exceeded, if (r.healthy) "true" else "false", esc_verdict,
+    const obj = try std.fmt.allocPrint(alloc, "{{\"task\":\"{s}\",\"deploys\":{d},\"retries\":{d},\"critic_rejections\":{d},\"mock_fallbacks\":{d},\"token_budgets_exceeded\":{d},\"run_time_exceeded\":{d},\"tokens\":{d},\"max_steps_exceeded\":{d},\"healthy\":{s},\"verdict\":\"{s}\"}}", .{
+        esc_task, r.deploys, r.retries, r.critic_rejections, r.mock_fallbacks, r.token_budgets_exceeded, r.run_time_exceeded, r.tokens, r.max_steps_exceeded, if (r.healthy) "true" else "false", esc_verdict,
     });
     defer alloc.free(obj);
     try buf.appendSlice(alloc, obj);

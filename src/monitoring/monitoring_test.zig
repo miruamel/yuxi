@@ -60,6 +60,8 @@ test "monitoring.writeReport emits verdict + escapes it" {
         .mock_fallbacks = 0,
         .token_budgets_exceeded = 0,
         .run_time_exceeded = 0,
+        .tokens = 0,
+        .max_steps_exceeded = 0,
         .healthy = false,
         .verdict = "quote\" inside",
     };
@@ -81,7 +83,7 @@ test "monitoring.writeReport emits verdict + escapes it" {
 
     const batch = [_]monitoring.TaskResult{
         single,
-        .{ .task = "ok task", .deploys = 1, .retries = 0, .critic_rejections = 0, .mock_fallbacks = 0, .token_budgets_exceeded = 0, .run_time_exceeded = 0, .healthy = true, .verdict = "" },
+        .{ .task = "ok task", .deploys = 1, .retries = 0, .critic_rejections = 0, .mock_fallbacks = 0, .token_budgets_exceeded = 0, .run_time_exceeded = 0, .tokens = 0, .max_steps_exceeded = 0, .healthy = true, .verdict = "" },
     };
     try monitoring.writeReport(allocator, io, path, "v0.3.0-test", null, &batch);
     const got2 = try fs.readFileAlloc(allocator, path);
@@ -90,4 +92,32 @@ test "monitoring.writeReport emits verdict + escapes it" {
     try std.testing.expect(std.mem.indexOf(u8, got2, "\"batch_healthy\":false") != null);
     try std.testing.expect(std.mem.indexOf(u8, got2, "\"tasks\":[") != null);
     try std.testing.expect(std.mem.indexOf(u8, got2, "\"verdict\":\"\"") != null);
+}
+
+test "monitoring.writeReport exposes tokens and max_steps_exceeded" {
+    // Regression: the JSON report must carry real token spend and the
+    // --max-steps abort counter so an external CI gate can see actual cost
+    // and plan-cap violations, not just the boolean verdict. Previously the
+    // report dropped both, leaving a gate blind to cost/plan-cap signals.
+    const allocator = std.heap.page_allocator;
+    const io = std.Io.Threaded.global_single_threaded.io();
+    const path = "/tmp/yuxi_report_fields_test.json";
+    const r = monitoring.TaskResult{
+        .task = "t",
+        .deploys = 1,
+        .retries = 0,
+        .critic_rejections = 0,
+        .mock_fallbacks = 0,
+        .token_budgets_exceeded = 0,
+        .run_time_exceeded = 0,
+        .tokens = 42,
+        .max_steps_exceeded = 2,
+        .healthy = true,
+        .verdict = "",
+    };
+    try monitoring.writeReport(allocator, io, path, "v0.4.0-test", r, null);
+    const got = try fs.readFileAlloc(allocator, path);
+    defer allocator.free(got);
+    try std.testing.expect(std.mem.indexOf(u8, got, "\"tokens\":42") != null);
+    try std.testing.expect(std.mem.indexOf(u8, got, "\"max_steps_exceeded\":2") != null);
 }

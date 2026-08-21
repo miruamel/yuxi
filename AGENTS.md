@@ -263,6 +263,9 @@ unhealthy (mock default stays exit 0). This is the engine reporting its own
 health — it does NOT implement the issue #2 deploy-gating fork; it only makes
 `TaskResult.verdict` carries the machine-readable reason (dup of
 `assessHealth.verdict`) so a gate can branch on *why*, not just the boolean.
+The JSON result also exposes `tokens` (real LLM spend) and
+`max_steps_exceeded` (plan-cap aborts) as structured fields, alongside the
+counters, so an external gate sees cost + plan-cap signals without parsing logs.
 
 ## Tooling caveat: no CodeGraph in this harness
 The autonomy charter (§4/§5) assumes a CodeGraph instrument. This project's
@@ -536,6 +539,8 @@ never a bare `ctx.allocator.free(e)` that leaves a dangling pointer for a later
   default) + plan_gate engine-run test (`max_attempts=1` stops after one
   attempt, no deploy). Off by default. Smoke-confirmed: `attempt 1/1` with the
   flag, `attempt 1/3` without.
+- `fix`: `--tasks` batch KB ledger honors `--kb-max-lines` (a13d322, #32). `recordBatch` ignored the operator's cap (called `store.save(.., null)`) while its per-run siblings threaded `kb_max_lines` — a long-running `--tasks` engine set to a cap still grew the ledger unbounded on the batch path, reopening the #29 hole. Wired `cfg.kb_max_lines` through `loop.runTasks`; added a regression test (ledger_test 9/9). CI green, merged squash.
+- `feat(observability)`: `--report` JSON now exposes `tokens` (real LLM spend) and `max_steps_exceeded` (plan-cap aborts) as structured fields in `TaskResult`, alongside the existing counters. An external CI gate can now read cost + plan-cap signals without parsing logs (closes a §30 visibility gap the report had since it was added). Behavior-preserving; `monitoring_test` regression asserts both fields. Not yet released (§28).
 
 
 
@@ -547,3 +552,4 @@ per-call counter was removed in `dc7f217`; gateway now does auth + validation
 + PII redaction only. Closed as *remove* (option B).
 
 Tracked for co-owner decision: issue #2 (--dry-run plan scope; --hitl gating scope).
+
