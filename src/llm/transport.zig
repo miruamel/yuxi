@@ -44,10 +44,23 @@ pub fn complete(allocator: std.mem.Allocator, io: std.Io, ctx: *types.Ctx, syste
         }
     }
     ctx.tokens += user.len / 4 + system.len / 8 + 16;
-    return switch (ctx.backend) {
+    const resp = switch (ctx.backend) {
         .mock => try mockComplete(allocator, system, user),
         .openai, .local => try http.complete(allocator, io, ctx, system, user),
     };
+    if (ctx.cache) |c| {
+        c.put(allocator, @tagName(ctx.backend), system, user, resp) catch {};
+    }
+    // Offline record mode (--record): capture every real (non-seam, non-replay)
+    // completion into Ctx.recorded so engine.run can flush it as a
+    // --replay-compatible transcript (delimited by `---` lines). Seam/replay/
+    // cache-hit paths return above without reaching here, matching the
+    // "real completion" contract.
+    if (ctx.record_path) |_| {
+        const dup = allocator.dupe(u8, resp) catch null;
+        if (dup) |d| ctx.recorded.append(allocator, d) catch {};
+    }
+    return resp;
 }
 
 fn mockComplete(allocator: std.mem.Allocator, system: []const u8, user: []const u8) ![]u8 {
