@@ -121,6 +121,22 @@ because the spawned `git` inherits no identity in this env.
 **Gating:** `engine.zig` only calls `deploy.run` when `evaluator.run`
 (`zig build-exe` compile + run) returns true. Invalid output is never committed and no
 workdir repo is created.
+- **Honest checkpoint signal (§30):** `deploy.run` returns `!bool` — `true` only
+  when the artifact was actually committed to the isolated repo. `engine.run`
+  increments `ctx.deploys` **only** on `true`, so a git failure (unavailable,
+  or a non-"nothing to commit" commit error) honestly reports `no deploy` in the
+  health verdict instead of a false-green deploy. An unchanged artifact
+  (re-run in the same workdir) is `nothing to commit` on **STDOUT** (stderr is
+  empty) — `deploy.run` treats that as `true` (idempotent, already checkpointed).
+  **Do NOT "simplify" `deploy.run` back to `_ =` + unconditional `ctx.deploys += 1`** —
+  that reopens the false-green signal.
+- **Gotcha — deploy spawns git through a real-allocator io.** Like
+  `evaluator.runTo`, `deploy.run` must NOT use `ctx.io` (global single-threaded,
+  `.failing` allocator → OOM on the child argv/env arena). It spawns git via a
+  per-call `std.Io.Threaded.init(ctx.allocator, .{ .environ =
+  std.Io.Threaded.global_single_threaded.environ.process_environ })` — the real
+  OS environ, not `ctx.environ` (tests set it to `.empty`, which would break
+  git's PATH/HOME resolution).
 - **Cleanup:** after a successful deploy, per-step `gen_{i}.zig` fragments are
   deleted (best-effort) so only `gen_final.zig` remains in `ctx.workdir`.
 - **Gateway sanitizer is live (not a no-op):** `gateway.run` returns the
@@ -557,6 +573,7 @@ never a bare `ctx.allocator.free(e)` that leaves a dangling pointer for a later
   attempt, no deploy). Off by default. Smoke-confirmed: `attempt 1/1` with the
   flag, `attempt 1/3` without.
 - `fix`: `--tasks` batch KB ledger honors `--kb-max-lines` (a13d322, #32). `recordBatch` ignored the operator's cap (called `store.save(.., null)`) while its per-run siblings threaded `kb_max_lines` — a long-running `--tasks` engine set to a cap still grew the ledger unbounded on the batch path, reopening the #29 hole. Wired `cfg.kb_max_lines` through `loop.runTasks`; added a regression test (ledger_test 9/9). CI green, merged squash.
+- `ec2f8fa` fix(deploy): `deploy.run` reports a real checkpoint status (`!bool`) instead of swallowing git results; `engine.run` only counts `ctx.deploys` on a real commit. Two latent bugs exposed by honoring the result and fixed: (1) `deploy.run` spawned git through `ctx.io` (`.failing` allocator → OOM, same trap as `evaluator.runTo`) — now a per-call real-allocator `Threaded` io with the OS environ; (2) git prints `nothing to commit` to STDOUT (empty stderr) on an idempotent re-run, so the commit check now scans both streams. Also restored `src/evaluator/evaluator.zig` to the `build.zig` test list (prior cycle had dropped it) and made the recovery tests hermetic (clean workdir at start) so a leftover `.git` can't poison the checkpoint. All 18 test roots green, `zig fmt --check` clean. CI green. Landed directly to master (no PR per cycle-owner decision).
 - `feat(observability)`: `--report` JSON exposes `tokens` + `max_steps_exceeded` (39a36e8, #33). Merged, not yet tagged (§28).
 - `test(§21)`: `--expect` end-to-end CLI test in `main_test` shells the built binary (3e1a6a1, #34). Merged, not yet tagged (§28).
 - `fix(security)`: gateway now enforces a real auth secret — `AE_TOKEN_EXPECTED=<secret>` makes `AE_TOKEN` must-match (constant-time, fail-closed), closing CWE-306/CWE-287 (e3a532d, #35). Legacy behavior preserved when `AE_TOKEN_EXPECTED` is unset, so dev/offline runs + all existing tests are unchanged. The engine still does NOT gate its own deploys (issue #2 reserved for co-owner). `gateway_test` adds 3 cases (mismatch/missing reject, correct admit). Merged, not yet tagged (§28).
