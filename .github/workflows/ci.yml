@@ -20,8 +20,8 @@ jobs:
         with:
           version: 0.16.0
       - name: Build
-        run: zig build
+        run: zig build -j2
       - name: Test
-        run: zig build test
+        run: zig build test -j2
       - name: Format check
         run: zig fmt --check src
