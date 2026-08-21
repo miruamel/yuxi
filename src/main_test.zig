@@ -168,6 +168,15 @@ test "main --kb-stats prints a ledger summary and exits zero" {
     try std.testing.expect(std.mem.indexOf(u8, got.stdout, "batch:          1") != null);
     try std.testing.expect(std.mem.indexOf(u8, got.stdout, "other:          1") != null);
     try std.testing.expect(std.mem.indexOf(u8, got.stdout, "latest: - some non-standard note line") != null);
+
+    // --kb-max-lines cap is echoed back by printStats so an operator can see
+    // the bound the inspector applied (knowledge.zig:192). This line had no
+    // test; assert it round-trips through the CLI.
+    const capped = try std.process.run(a, io, .{ .argv = &[_][]const u8{ bin, "--no-hitl", "--mock", "--kb-stats", "--kb-max-lines", "5", "--kb", kb } });
+    defer a.free(capped.stdout);
+    defer a.free(capped.stderr);
+    try std.testing.expect(capped.term == .exited and capped.term.exited == 0);
+    try std.testing.expect(std.mem.indexOf(u8, capped.stdout, "cap (--kb-max-lines): 5") != null);
 }
 test "main --expect gates deploy end-to-end via the CLI flag" {
     // Regression guard (§21): the --expect behavioral-verification flag must
