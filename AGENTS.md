@@ -487,6 +487,18 @@ never a bare `ctx.allocator.free(e)` that leaves a dangling pointer for a later
   <commit> <tag>` and `git grep <symbol> <tag> -- src` are ground truth for
   release contents. Treat a cycle-summary "merged" claim as untrusted until the
   PR state (`gh pr view`) + tag tree confirm it.
+- `fix(knowledge)`: bound the KB ledger on write (#29, `3049e8f`). `save`
+  appended without limit while only `tailLessons` bounded injection, so a
+  long-running autonomous engine grew the ledger forever and reloaded it in
+  full each run. `save` now enforces `--kb-max-lines` on write (null = prior
+  unbounded default). Extracted `load`/`save`/`tailLessons` into
+  `knowledge/store.zig`; `knowledge.zig` 203→122 SLOC (was a §8 breach) and
+  `knowledge/` stays at 4 files (≤5 §8). Re-exported `load`/`save` so callers
+  are unchanged. Regression tests for bounded + unbounded save. Merged via
+  squash; build-and-test green.
+- `note`: CI shows a Node.js 20 deprecation annotation (actions/checkout@v4,
+  mlugg/setup-zig@v2 forced onto Node.js 24). Not a failure; track as a future
+  workflow-maintenance item, don't block merges on it.
 
 
 

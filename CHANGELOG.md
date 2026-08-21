@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+### KB ledger now bounded on write (fix, reliability/perf, §8, PR #29)
+- `knowledge.save` appended lessons without limit while only `tailLessons`
+  bounded what got injected into the next decomposition prompt. For a
+  continuously running autonomous engine that meant unbounded disk growth and
+  an O(n) reload of the whole ledger every run. `save` now enforces
+  `--kb-max-lines` on write: after appending, if the file exceeds the bound it
+  is rewritten to its last N lines. Off by default (null) preserves the prior
+  unbounded behavior. Storage primitives (`load`/`save`/`tailLessons`) were
+  extracted into `knowledge/store.zig`, dropping `knowledge.zig` from 203 →
+  122 SLOC (was a §8 >200 breach) and keeping `knowledge/` at 4 files (≤5 §8).
+  `knowledge.zig` re-exports `load`/`save` so callers/tests are unchanged.
+  Added regression tests for bounded + unbounded save.
+
 ## v0.4.0 (2026-08-20)
 Fourth tagged release. Batching 6 merged PRs (#20, #24, #25, #26, #27, #28) since v0.3.0 —
 a security fix (CWE-214, #20), docs/help sync (#24), offline replay resilience (#25),
