@@ -258,6 +258,7 @@ NOT a degradation, so it never trips `assessHealth` (unlike `mock_fallbacks`).
 (via `std.process.run`). It invokes `curl` with **array argv** (never a shell),
 so `url`/`body`/`key` are passed positionally and cannot inject shell
 commands — do NOT "simplify" this to a `sh -c`/string-command invocation.
+- **Critic static denylist is substring-based, not exact tokens (security).** `critic.dangerous()` matches `std.process`, `@cImport`, `@import("c")`, `asm`, `@export` as *substrings*, not the exact `std.process.Child` token. Reason: indirection like `@field(std.process, "Child")` or `std.process.spawn` contains `std.process` but not `std.process.Child`, so an exact-token match is a real bypass that let malicious code reach the evaluator/deploy. None of these substrings appear in the mock backend's benign step output, so the green deploy path is unaffected. Do NOT "simplify" this back to exact tokens — that reopens the bypass. The denylist runs per-fragment (step.build) and is deterministic (no LLM call); re-scanning the merged artifact is redundant (tokens are a union of fragments) and intentionally avoided.
 `jsonEscape` escapes the full RFC 8259 control range (U+0000–U+001F) because
 the prompt path carries semi-trusted input (KB lessons, recorded evaluator
 errors, task text) that can contain raw control bytes; an unescaped one
