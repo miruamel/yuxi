@@ -6,6 +6,7 @@ Fixes for the knowledge-base learning loop, which was broken on the primary
 the `--kb` feature shipped in v0.1.0 and the `--max-time` cap in v0.5.0, but
 neither reached the ledger the way the two earlier autonomy caps did.
 
+### 🤖 Autonomous Agent Contributions
 ### `--kb` was a silent no-op on a single `--task` run (fix, reliability, §11/§12)
 - `engine.newCtx` threaded `kb_max_lines`, `replay_path`, and `record_path`
   through to the `Ctx`, but **not `kb_path`** — so `ctx.kb_path` stayed `null`
@@ -20,6 +21,7 @@ neither reached the ledger the way the two earlier autonomy caps did.
   lets `--kb-stats` summarize a real ledger. No flag or schema change; the
   `--tasks` path is unaffected (it still calls `recordBatch` directly).
 
+
 ### `recordLesson` now persists the `--max-time` cap hit (fix, learn-loop, §12)
 - `run_time_exceeded` was surfaced everywhere except the KB: `assessHealth`,
   `monitoring.report`, and `TaskResult` all emitted the `wall-time exceeded;`
@@ -30,10 +32,12 @@ neither reached the ledger the way the two earlier autonomy caps did.
   (#27/#28): both `recordLesson` lesson formats now append
   `run_time_ex={d}`. `knowledge.recorders_test` asserts it.
 
+
 ### Stale doc pointer corrected (fix, repo-hygiene, §24)
 - `AGENTS.md` named `ledger_test` as a live test file; that module was
   superseded by `recorders_test.zig` in `16daa1f`. Now points at the file
   that actually exists.
+
 
 ### Governance hygiene: PR template, doc pointer, README glyph, dead import (fix, repo-hygiene, §24/§8/§41-E)
 - `AGENTS.md` gained an `## Autonomous agent governance` section pointing at
@@ -57,6 +61,23 @@ neither reached the ledger the way the two earlier autonomy caps did.
   review a PR, or raise concerns. `CONTRIBUTING.md` now points at the
   governance doc and documents the branching/commit/verification-gate
   conventions, including the `--jobs 2` resource cap.
+
+
+### Docs command sweep: every build/test/lint command capped at `-j2` (fix, repo-hygiene, §8/§36)
+
+- Zig uses `-j2` (not `--jobs 2`); `--jobs 2` is a GNU make convention and
+  was already wrong in `AUTONOMOUS_AGENT.md`. Sweep of every markdown command
+  block found bare `zig build` / `zig build test` contradicting the constraint
+  already named in `README.md:110` and `CONTRIBUTING.md:35`:
+- `README.md` Build & Run, `DESIGN.md` Run, `AGENTS.md` Build & Run + Verify,
+  `CONTRIBUTING.md` verification gates, `.github/PULL_REQUEST_TEMPLATE.md`
+  verification checkboxes, and `AUTONOMOUS_AGENT.md` repository invariants
+  all now carry `-j2` with an explicit §8/§36 comment.
+- CI (`ci.yml`) already used `-j2`; the fix is purely documentation, no
+  behavior change. `zig build -j2` and `zig build test -j2` both exit 0.
+
+### Human / Other Contributions
+- (none this cycle)
 
 ## v0.6.0 (2026-08-21)
 Seventh tagged release. Batches three substantive changes merged to `master` since v0.5.1.
