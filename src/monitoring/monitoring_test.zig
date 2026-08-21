@@ -26,6 +26,27 @@ test "monitoring.assessHealth warns on an unhealthy cycle" {
     try std.testing.expect(std.mem.indexOf(u8, hv.verdict, "self-correction exhausted") != null);
     try std.testing.expect(std.mem.indexOf(u8, hv.verdict, "mock fallback dominated") != null);
 }
+test "monitoring.assessHealth warns on a wall-clock cap hit" {
+    // The --max-time abort is a distinct health signal (not a generic "no
+    // deploy"): a run that was killed by the wall-clock cap must surface
+    // "wall-time exceeded" so the KB steer and an external gate can see it.
+    // Regression: this clause had no direct test — the unhealthy-cycle test
+    // below sets every other counter but never run_time_exceeded, so the
+    // verdict branch was unexercised.
+    const allocator = std.heap.page_allocator;
+    const io = std.Io.Threaded.global_single_threaded.io();
+    const workdir = "/tmp/yuxi_walltime_test";
+
+    var ctx = try types.Ctx.init(allocator, io, .empty, .no_hitl, .mock, null, "", workdir);
+    ctx.deploys = 1;
+    ctx.run_time_exceeded = 1;
+    const hv = try monitoring.assessHealth(&ctx);
+    defer if (hv.verdict.len > 0) allocator.free(hv.verdict);
+
+    try std.testing.expect(!hv.healthy);
+    try std.testing.expect(std.mem.indexOf(u8, hv.verdict, "wall-time exceeded") != null);
+    try std.testing.expect(std.mem.indexOf(u8, hv.verdict, "no deploy") == null);
+}
 
 test "monitoring.assessHealth is silent on a healthy cycle" {
     // A cycle that deployed real work (deploys >= 1, no fallbacks, no budget
