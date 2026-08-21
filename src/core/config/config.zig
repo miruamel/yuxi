@@ -15,6 +15,10 @@ pub const Config = struct {
     /// fail-closed — a hung build/eval/deploy can otherwise stall forever.
     /// Null (off) by default. Parsed from `--max-time N` seconds.
     max_time_ms: ?usize,
+    /// Optional cap on self-correction retries per run. Null (default 3)
+    /// preserves the historical retry budget; operator-tunable so an
+    /// unattended loop can widen/narrow eval retries deliberately.
+    max_attempts: ?usize,
     tasks: ?[]const u8,
     kb_path: ?[]const u8,
     kb_max_lines: ?usize,
@@ -46,6 +50,7 @@ pub fn parse(gpa: std.mem.Allocator, io: std.Io, args: *std.process.Args.Iterato
     var max_tokens: ?usize = null;
     var max_steps: ?usize = null;
     var max_time_ms: ?usize = null;
+    var max_attempts: ?usize = null;
     var tasks: ?[]const u8 = null;
     var kb_path: ?[]const u8 = null;
     var kb_max_lines: ?usize = null;
@@ -74,6 +79,8 @@ pub fn parse(gpa: std.mem.Allocator, io: std.Io, args: *std.process.Args.Iterato
                 const secs = std.fmt.parseUnsigned(usize, s, 10) catch null;
                 if (secs) |v| max_time_ms = v * 1000;
             }
+        } else if (std.mem.eql(u8, arg, "--max-attempts")) {
+            if (args.next()) |m| max_attempts = std.fmt.parseUnsigned(usize, m, 10) catch null;
         } else if (std.mem.eql(u8, arg, "-V") or std.mem.eql(u8, arg, "--version")) {
             printVersion(io);
             return error.VersionRequested;
@@ -111,7 +118,7 @@ pub fn parse(gpa: std.mem.Allocator, io: std.Io, args: *std.process.Args.Iterato
         printHelp(io);
         return error.MissingTask;
     };
-    return .{ .mode = mode, .backend = backend, .task = t, .workdir = workdir, .cache_path = cache_path, .expect = expect, .max_tokens = max_tokens, .max_steps = max_steps, .max_time_ms = max_time_ms, .tasks = tasks, .kb_path = kb_path, .kb_max_lines = kb_max_lines, .replay_path = replay_path, .record_path = record_path, .report_path = report_path, .health_hook = health_hook, .always_hook = always_hook };
+    return .{ .mode = mode, .backend = backend, .task = t, .workdir = workdir, .cache_path = cache_path, .expect = expect, .max_tokens = max_tokens, .max_steps = max_steps, .max_time_ms = max_time_ms, .max_attempts = max_attempts, .tasks = tasks, .kb_path = kb_path, .kb_max_lines = kb_max_lines, .replay_path = replay_path, .record_path = record_path, .report_path = report_path, .health_hook = health_hook, .always_hook = always_hook };
 }
 fn printHelp(io: std.Io) void {
     types.logLine(io, "Yuxi (玉溪): autonomous software evolution engine", .{});
@@ -129,7 +136,7 @@ fn printHelp(io: std.Io) void {
     types.logLine(io, "  --max-tokens N       soft LLM-spend ceiling; default off", .{});
 
     types.logLine(io, "  --max-steps N        cap autonomous plan size; default off", .{});
-    types.logLine(io, "  --max-time N         wall-clock cap per run, in seconds; default off", .{});
+    types.logLine(io, "  --max-attempts N     cap self-correction retries per run (default 3)", .{});
     types.logLine(io, "Knowledge:", .{});
     types.logLine(io, "  --kb[=DIR]           knowledge ledger path", .{});
     types.logLine(io, "  --kb-max-lines[=N]  cap injected lessons (bare=200, default off)", .{});

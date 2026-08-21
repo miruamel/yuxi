@@ -71,7 +71,7 @@ pub fn run(allocator: std.mem.Allocator, io: std.Io, ctx: *types.Ctx, task: []co
     var verified = false;
     var feedback: ?[]const u8 = null;
     defer if (feedback) |f| allocator.free(f);
-    const max_attempts: usize = 3;
+    const max_attempts: usize = ctx.max_attempts orelse 3;
     var attempt: usize = 0;
     // Wall-clock cap: abort fail-closed if the run has overrun --max-time.
     if (start_ns) |t0| {
@@ -166,6 +166,7 @@ pub fn newCtx(allocator: std.mem.Allocator, io: std.Io, environ: std.process.Env
     ctx.max_tokens = cfg.max_tokens;
     ctx.max_steps = cfg.max_steps;
     ctx.max_time_ms = cfg.max_time_ms;
+    ctx.max_attempts = cfg.max_attempts;
     ctx.cache = blk: {
         const cp = cfg.cache_path orelse break :blk null;
         const c = allocator.create(cache_mod.Cache) catch break :blk null;

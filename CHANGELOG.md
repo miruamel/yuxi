@@ -29,6 +29,21 @@
   `engine.zig` to ~180 SLOC and keeping `core/` at 5 top-level files (§8 OK).
   `engine.run` now calls `runlife.finishRun` / `runlife.flushRecord`;
   `build.zig` registers the module in the all-to-all DAG. No behavior change.
+
+### Self-correction retry cap: `--max-attempts N` (feat, autonomy tuning, §11/§14)
+- The build/eval self-correction loop was hardcoded to 3 attempts in
+  `engine.zig`; `--max-attempts N` now makes that budget operator-configurable
+  — the fourth member of the autonomy-cap family alongside `--max-steps`,
+  `--max-tokens`, and `--max-time`. An unattended loop can now deliberately
+  widen retries (e.g. flaky eval) or narrow them (fail fast). `Ctx.max_attempts`
+  (`?usize`, null → historical default 3) flows `config.parse` (`--max-attempts`)
+  → `engine.newCtx` → the attempt loop bound (`ctx.max_attempts orelse 3`).
+  Unlike the other three caps this is NOT a fail-closed safety abort: exhausting
+  retries is the normal "nothing deployed" outcome, so it reuses the existing
+  health-verdict path rather than minting a new `attempts_exceeded` clause.
+  Help text + `--help` updated. Tests: `config_test` asserts `--max-attempts 5`
+  → 5 (and null by default); a new `engine.run` test asserts `max_attempts=1`
+  stops after one attempt with no deploy. Off by default (preserves 3).
 ### KB ledger now bounded on write (fix, reliability/perf, §8, PR #29)
 - `knowledge.save` appended lessons without limit while only `tailLessons`
   bounded what got injected into the next decomposition prompt. For a

@@ -91,3 +91,52 @@ test "engine.run aborts on a wall-clock cap (--max-time) before deploy" {
     defer allocator.free(kb);
     try std.testing.expect(std.mem.indexOf(u8, kb, "wall-time exceeded") != null);
 }
+
+// Injected backend: produces valid code + APPROVEs the plan, but the build is
+// rigged so evaluation always fails (gen_final.zig has a compile-time panic).
+// Used to exhaust the self-correction retry budget and prove --max-attempts
+// bounds the attempt loop rather than retrying forever.
+fn llmFailEval(alloc: std.mem.Allocator, io: std.Io, ctx: *types.Ctx, system: []const u8, user: []const u8) anyerror![]u8 {
+    _ = ctx;
+    _ = io;
+    if (std.mem.indexOf(u8, system, "decomposer") != null) {
+        return alloc.dupe(u8,
+            \\STEP: write a panicking main
+        );
+    }
+    if (std.mem.indexOf(u8, system, "code generator") != null) {
+        return alloc.dupe(u8,
+            \\pub fn main() void {
+            \\    @panic("boom");
+            \\}
+        );
+    }
+    if (std.mem.indexOf(u8, user, "Plan:") != null) return alloc.dupe(u8, "APPROVE");
+    if (std.mem.indexOf(u8, system, "critic") != null) return alloc.dupe(u8, "APPROVE");
+    return alloc.dupe(u8, user);
+}
+
+test "engine.run bounds self-correction retries to --max-attempts" {
+    // The attempt loop must stop after ctx.max_attempts attempts (not retry
+    // forever) when evaluation keeps failing. max_attempts=1 -> exactly one
+    // attempt, no deploy. This is the 4th autonomy-cap (after --max-steps,
+    // --max-tokens, --max-time); null leaves the historical default of 3.
+    const allocator = std.heap.page_allocator;
+    const io = std.Io.Threaded.global_single_threaded.io();
+    const workdir = "/tmp/yuxi_maxattempts_test";
+    std.Io.Dir.deleteTree(std.Io.Dir.cwd(), io, workdir) catch {};
+    try fs.ensureDir(allocator, workdir);
+
+    var ctx = try types.Ctx.init(allocator, io, .empty, .no_hitl, .mock, null, "", workdir);
+    ctx.kb_path = "/tmp/yuxi_maxattempts_test/kb.md";
+    ctx.llm_fn = llmFailEval;
+    ctx.max_attempts = 1;
+    try engine.run(allocator, io, &ctx, "write a panicking main");
+
+    // One attempt only: build loop ran once, no deploy, retries counts the
+    // failed-evaluation follow-up (0 since attempt+1 < max_attempts is false).
+    try std.testing.expect(ctx.deploys == 0);
+    const final_path = try std.fmt.allocPrint(allocator, "{s}/gen_final.zig", .{workdir});
+    defer allocator.free(final_path);
+    try std.testing.expect(!fs.fileExists(final_path));
+}

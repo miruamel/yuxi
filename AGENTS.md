@@ -524,6 +524,18 @@ never a bare `ctx.allocator.free(e)` that leaves a dangling pointer for a later
   No behavior change. Lesson: after adding a feature, re-check the §8 SLOC
   ceiling — a feature that fits today can push a file over 200 once combined
   with prior edits; extract a cohesive subtree rather than splitting arbitrarily.
+- `feat`: self-correction retry cap `--max-attempts N` (Unreleased, see PR #31).
+  The build/eval loop was hardcoded to 3 attempts in engine.zig; now
+  operator-tunable — the 4th autonomy cap after --max-steps/--max-tokens/
+  --max-time. `Ctx.max_attempts` (`?usize`, null→3) → `config.parse`
+  (`--max-attempts N`) → `engine.newCtx` → attempt loop bound
+  (`ctx.max_attempts orelse 3`). NOT a fail-closed safety abort (unlike the
+  other three caps): exhausting retries is the normal "nothing deployed"
+  outcome, so it reuses the existing health-verdict path (no new
+  `attempts_exceeded` clause). Tests: config_test (`--max-attempts 5`→5, null
+  default) + plan_gate engine-run test (`max_attempts=1` stops after one
+  attempt, no deploy). Off by default. Smoke-confirmed: `attempt 1/1` with the
+  flag, `attempt 1/3` without.
 
 
 
