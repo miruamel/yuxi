@@ -56,3 +56,25 @@ pub fn flushRecord(allocator: std.mem.Allocator, ctx: *types.Ctx) void {
     defer allocator.free(content);
     fs.writeFileAlloc(allocator, rp, content) catch |e| ctx.log("[transport] record write failed: {s}", .{@errorName(e)});
 }
+
+/// Resolve the current monotonic-clock value (ns). Prefers an injected
+/// `Ctx.clock_ns` so the `--max-time` cap is testable deterministically;
+/// falls back to the live `std.os.linux.clock_gettime` for production runs.
+pub fn clockNs(ctx: *types.Ctx) u64 {
+    if (ctx.clock_ns) |f| return f();
+    var ts: std.os.linux.timespec = undefined;
+    if (std.os.linux.clock_gettime(std.os.linux.CLOCK.MONOTONIC, &ts) == 0) {
+        return @as(u64, @intCast(ts.sec)) * std.time.ns_per_s + @as(u64, @intCast(ts.nsec));
+    }
+    return 0;
+}
+
+/// Wall-clock cap check shared by the pre-loop and per-attempt guards.
+/// Returns the configured cap (ms) when the run has exceeded it, else null.
+/// `start_ns` is null when no cap is set, so the check is a no-op off by default.
+pub fn wallClockExceeded(ctx: *types.Ctx, start_ns: ?u64) ?usize {
+    const t0 = start_ns orelse return null;
+    const ms = ctx.max_time_ms orelse return null;
+    if (clockNs(ctx) - t0 >= ms * std.time.ns_per_ms) return ms;
+    return null;
+}

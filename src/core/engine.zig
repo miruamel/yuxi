@@ -22,9 +22,11 @@ pub fn run(allocator: std.mem.Allocator, io: std.Io, ctx: *types.Ctx, task: []co
     // run unattended forever; the timer starts here so the whole run is bounded.
     // The cap is checked at the top of every attempt (not just once before the
     // loop) so a single slow evaluator.run can't slip past it undetected.
+    // Clock helpers live in runlife.zig (which also owns the LAYER 7-9 tail),
+    // keeping this file under the §8 200-SLOC ceiling.
     var start_ns: ?u64 = null;
     if (ctx.max_time_ms != null) {
-        start_ns = clockNs(ctx);
+        start_ns = runlife.clockNs(ctx);
     }
     defer runlife.flushRecord(allocator, ctx);
 
@@ -73,7 +75,7 @@ pub fn run(allocator: std.mem.Allocator, io: std.Io, ctx: *types.Ctx, task: []co
     // Wall-clock cap: abort fail-closed if the run has overrun --max-time.
     // Checked here (before the loop) and again at the top of every attempt,
     // so a single slow evaluator.run can't slip past the cap undetected.
-    if (wallClockExceeded(ctx, start_ns)) |ms| {
+    if (runlife.wallClockExceeded(ctx, start_ns)) |ms| {
         ctx.record("engine: wall-clock cap exceeded");
         ctx.run_time_exceeded += 1;
         ctx.log("[engine] wall-clock cap ({d} ms) exceeded; aborting run", .{ms});
@@ -82,7 +84,7 @@ pub fn run(allocator: std.mem.Allocator, io: std.Io, ctx: *types.Ctx, task: []co
     while (attempt < max_attempts) : (attempt += 1) {
         // Re-check the wall-clock cap at the top of every attempt so a slow
         // build/eval can't run past the operator's --max-time bound.
-        if (wallClockExceeded(ctx, start_ns)) |ms| {
+        if (runlife.wallClockExceeded(ctx, start_ns)) |ms| {
             ctx.record("engine: wall-clock cap exceeded");
             ctx.run_time_exceeded += 1;
             ctx.log("[engine] wall-clock cap ({d} ms) exceeded; aborting run", .{ms});
@@ -184,26 +186,4 @@ pub fn newCtx(allocator: std.mem.Allocator, io: std.Io, environ: std.process.Env
     ctx.replay_path = cfg.replay_path;
     ctx.record_path = cfg.record_path;
     return ctx;
-}
-
-/// Resolve the current monotonic-clock value (ns). Prefers an injected
-/// `Ctx.clock_ns` so the `--max-time` cap is testable deterministically;
-/// falls back to the live `std.os.linux.clock_gettime` for production runs.
-fn clockNs(ctx: *types.Ctx) u64 {
-    if (ctx.clock_ns) |f| return f();
-    var ts: std.os.linux.timespec = undefined;
-    if (std.os.linux.clock_gettime(std.os.linux.CLOCK.MONOTONIC, &ts) == 0) {
-        return @as(u64, @intCast(ts.sec)) * std.time.ns_per_s + @as(u64, @intCast(ts.nsec));
-    }
-    return 0;
-}
-
-/// Wall-clock cap check shared by the pre-loop and per-attempt guards.
-/// Returns the configured cap (ms) when the run has exceeded it, else null.
-/// `start_ns` is null when no cap is set, so the check is a no-op off by default.
-fn wallClockExceeded(ctx: *types.Ctx, start_ns: ?u64) ?usize {
-    const t0 = start_ns orelse return null;
-    const ms = ctx.max_time_ms orelse return null;
-    if (clockNs(ctx) - t0 >= ms * std.time.ns_per_ms) return ms;
-    return null;
 }
