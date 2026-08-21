@@ -17,8 +17,8 @@ test "knowledge save then load returns accumulated lessons" {
     const path = try std.fmt.allocPrint(alloc, "{s}/kb.md", .{base});
     defer alloc.free(path);
     defer std.Io.Dir.deleteTree(std.Io.Dir.cwd(), io, base) catch {};
-    try knowledge.save(alloc, path, "lesson one");
-    try knowledge.save(alloc, path, "lesson two");
+    try knowledge.save(alloc, path, "lesson one", null);
+    try knowledge.save(alloc, path, "lesson two", null);
     const got = (try knowledge.load(alloc, path)).?;
     defer alloc.free(got);
     try std.testing.expect(std.mem.indexOf(u8, got, "lesson one") != null);
@@ -40,7 +40,7 @@ test "knowledge injectPrompt prepends prior lessons from configured kb" {
     const path = try std.fmt.allocPrint(alloc, "{s}/kb.md", .{base});
     defer alloc.free(path);
     defer std.Io.Dir.deleteTree(std.Io.Dir.cwd(), io, base) catch {};
-    try knowledge.save(alloc, path, "prior lesson A");
+    try knowledge.save(alloc, path, "prior lesson A", null);
     var ctx = try types.Ctx.init(alloc, io, .empty, .no_hitl, .mock, null, "", base);
     ctx.kb_path = path;
     const prompt = try knowledge.injectPrompt(&ctx, "do a thing");
@@ -57,9 +57,9 @@ test "knowledge injectPrompt caps to kb_max_lines when set" {
     defer alloc.free(path);
     defer std.Io.Dir.deleteTree(std.Io.Dir.cwd(), io, base) catch {};
     // Three lessons, three newlines (each save is newline-terminated).
-    try knowledge.save(alloc, path, "prior lesson A");
-    try knowledge.save(alloc, path, "prior lesson B");
-    try knowledge.save(alloc, path, "prior lesson C");
+    try knowledge.save(alloc, path, "prior lesson A", null);
+    try knowledge.save(alloc, path, "prior lesson B", null);
+    try knowledge.save(alloc, path, "prior lesson C", null);
     var ctx = try types.Ctx.init(alloc, io, .empty, .no_hitl, .mock, null, "", base);
     ctx.kb_path = path;
     ctx.kb_max_lines = 2;
@@ -79,9 +79,9 @@ test "knowledge injectPrompt is uncapped when kb_max_lines is null" {
     const path = try std.fmt.allocPrint(alloc, "{s}/kb.md", .{base});
     defer alloc.free(path);
     defer std.Io.Dir.deleteTree(std.Io.Dir.cwd(), io, base) catch {};
-    try knowledge.save(alloc, path, "prior lesson A");
-    try knowledge.save(alloc, path, "prior lesson B");
-    try knowledge.save(alloc, path, "prior lesson C");
+    try knowledge.save(alloc, path, "prior lesson A", null);
+    try knowledge.save(alloc, path, "prior lesson B", null);
+    try knowledge.save(alloc, path, "prior lesson C", null);
     var ctx = try types.Ctx.init(alloc, io, .empty, .no_hitl, .mock, null, "", base);
     ctx.kb_path = path;
     ctx.kb_max_lines = null;
