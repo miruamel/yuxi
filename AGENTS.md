@@ -357,6 +357,15 @@ owns those). In a unit test use `std.heap.page_allocator` (not
 and free `eval_error` via `ctx.clearEvalError()` (which nulls the field),
 never a bare `ctx.allocator.free(e)` that leaves a dangling pointer for a later
 `clearEvalError` to double-free.
+- **Gotcha — engine does not create its workdir.** `engine.run` writes
+  `gen_*.zig`/`gen_final.zig` into `ctx.workdir` but never `mkdir`s it; a
+  deploying run only succeeds if the workdir already exists (deploy.run's
+  `ensureDir` runs *after* the builder writes). A CLI test (or any caller)
+  that shells a deploying run with a custom `--out` MUST `fs.ensureDir` the dir
+  first, or the first builder write fails with `FileNotFound` and the run
+  exits 1. The default `ae_out/` only "works" because a prior run left it
+  behind — do not rely on that. (`main_test` now isolates `--out` + ensureDirs
+  it for the `--expect` e2e test.)
 - Real LLM backends (`.openai`/`.local`) shell `curl` via `http.complete`
   (llm/http.zig), which retries up to 3 times with backoff and a 60s/10s curl
   timeout. `extractContent` unescapes JSON `\n`/`\t` so multi-line generated
@@ -541,6 +550,7 @@ never a bare `ctx.allocator.free(e)` that leaves a dangling pointer for a later
   flag, `attempt 1/3` without.
 - `fix`: `--tasks` batch KB ledger honors `--kb-max-lines` (a13d322, #32). `recordBatch` ignored the operator's cap (called `store.save(.., null)`) while its per-run siblings threaded `kb_max_lines` — a long-running `--tasks` engine set to a cap still grew the ledger unbounded on the batch path, reopening the #29 hole. Wired `cfg.kb_max_lines` through `loop.runTasks`; added a regression test (ledger_test 9/9). CI green, merged squash.
 - `feat(observability)`: `--report` JSON now exposes `tokens` (real LLM spend) and `max_steps_exceeded` (plan-cap aborts) as structured fields in `TaskResult`, alongside the existing counters. An external CI gate can now read cost + plan-cap signals without parsing logs (closes a §30 visibility gap the report had since it was added). Behavior-preserving; `monitoring_test` regression asserts both fields. Not yet released (§28).
+- `test(§21)`: `--expect` now has a true end-to-end CLI test — `main_test` shells the built binary with `--expect "step result: 2+3=5"` (exit 0, verified deploy) and `--expect "nope"` (exit 1, retries exhausted) — proving the flag works through `main -> config.parse -> engine.newCtx -> evaluator.run`, not just the `evaluator.run` unit test. Closes the coverage gap flagged this cycle. Not yet released (§28).
 
 
 

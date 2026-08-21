@@ -108,3 +108,43 @@ test "main --version prints the build stamp and exits zero" {
     const out = std.mem.trim(u8, ver.stdout, "\r\n");
     try std.testing.expect(std.mem.startsWith(u8, out, "yuxi v"));
 }
+
+test "main --expect gates deploy end-to-end via the CLI flag" {
+    // Regression guard (§21): the --expect behavioral-verification flag must
+    // work through the real CLI path (main -> config.parse -> engine.newCtx ->
+    // evaluator.run), not just the evaluator unit test. The mock backend emits
+    // `step result: 2+3=5`, so a matching expectation verifies successfully
+    // (deploy, exit 0) while a wrong expectation fails self-correction and the
+    // run exits 1 (the §30 unhealthy-verdict contract).
+    const a = std.heap.page_allocator;
+    var threaded = std.Io.Threaded.init(a, .{ .environ = std.Io.Threaded.global_single_threaded.environ.process_environ });
+    defer threaded.deinit();
+    const bin = "zig-out/bin/yuxi";
+    // Isolated workdir: deploy.run `git init`-commits into it, so a pre-existing
+    // `ae_out/` (left by the selfcorr engine test in this same binary, or a
+    // prior CI run) would make the commit collide and the run exit non-zero. A
+    // dedicated dir keeps the CLI test hermetic regardless of ordering.
+    const wd = "/tmp/yuxi_expect_cli";
+    const io = threaded.io();
+    std.Io.Dir.deleteTree(std.Io.Dir.cwd(), io, wd) catch {};
+    // The engine writes gen_*.zig into workdir but does not create it; it must
+    // pre-exist (deploy.run's ensureDir runs after the builder writes). Mirror
+    // a real operator's checkout by creating it first so the run can deploy.
+    try fs.ensureDir(a, wd);
+
+    // Matching expectation -> verified deploy -> exit 0.
+    const ok = try std.process.run(a, io, .{ .argv = &[_][]const u8{ bin, "--no-hitl", "--mock", "--out", wd, "--expect", "step result: 2+3=5", "add a calculator" } });
+    defer a.free(ok.stdout);
+    defer a.free(ok.stderr);
+    try std.testing.expect(ok.term == .exited and ok.term.exited == 0);
+
+    // Mismatching expectation -> eval error fed back, retries exhausted, no
+    // deploy -> unhealthy verdict -> exit 1 (mock output is deterministic, so a
+    // wrong --expect can never be satisfied).
+    const bad = try std.process.run(a, io, .{ .argv = &[_][]const u8{ bin, "--no-hitl", "--mock", "--out", wd, "--expect", "nope", "add a calculator" } });
+    defer a.free(bad.stdout);
+    defer a.free(bad.stderr);
+    try std.testing.expect(bad.term == .exited and bad.term.exited == 1);
+
+    std.Io.Dir.deleteTree(std.Io.Dir.cwd(), io, wd) catch {};
+}
