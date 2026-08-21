@@ -44,6 +44,18 @@
   Help text + `--help` updated. Tests: `config_test` asserts `--max-attempts 5`
   → 5 (and null by default); a new `engine.run` test asserts `max_attempts=1`
   stops after one attempt with no deploy. Off by default (preserves 3).
+### Batch KB ledger honors `--kb-max-lines` (fix, reliability, PR #32)
+- `--tasks` mode persisted its aggregate health summary via `knowledge.recordBatch`, which called `store.save(.., null)` and ignored the operator's `--kb-max-lines` cap — reopening the unbounded-growth hole #29 closed for the per-run paths. `recordBatch` now threads `kb_max_lines` (wired from `loop.runTasks` → `cfg.kb_max_lines`), so a continuous `--tasks` engine set to a cap stays bounded on the batch path too. Added a regression test asserting the bound holds on write. Behavior unchanged when no cap is set.
+
+### Run health report exposes `tokens` + `max_steps_exceeded` (feat, observability, §11/§14)
+- `monitoring.TaskResult` / the `--report` JSON now carry `tokens` (real LLM
+  spend this run) and `max_steps_exceeded` (plan-cap aborts) alongside the
+  existing counters, so an external CI gate can read cost and plan-cap signals
+  without parsing logs. The report had dropped both since it was added, leaving
+  a gate blind to cost and `--max-steps` violations. `monitoring.taskResult`
+  populates the new fields from `Ctx`; `writeReport`/`appendResult` serialize
+  them; `monitoring_test` asserts both appear. Behavior-preserving — no engine
+  logic or verdict change; off by default.
 ### KB ledger now bounded on write (fix, reliability/perf, §8, PR #29)
 - `knowledge.save` appended lessons without limit while only `tailLessons`
   bounded what got injected into the next decomposition prompt. For a
