@@ -96,12 +96,14 @@ pub fn recordHealth(ctx: *types.Ctx, verdict: []const u8) !void {
 /// shape* (e.g. every task mock-fell-back, or none deployed), not only from a
 /// single cycle's verdict. No-op when no KB is configured, or when `summary`
 /// is empty (an empty batch has nothing to learn).
-pub fn recordBatch(alloc: std.mem.Allocator, kb_path: ?[]const u8, summary: []const u8) !void {
+pub fn recordBatch(alloc: std.mem.Allocator, kb_path: ?[]const u8, summary: []const u8, kb_max_lines: ?usize) !void {
     if (kb_path) |kb| {
         if (summary.len == 0) return;
         const lesson = try std.fmt.allocPrint(alloc, "- batch: {s}", .{summary});
         defer alloc.free(lesson);
-        try store.save(alloc, kb, lesson, null);
+        // Honor the operator's --kb-max-lines cap so the batch ledger stays
+        // bounded on write, exactly like recordLesson/recordHealth (PR #29).
+        try store.save(alloc, kb, lesson, kb_max_lines);
     }
 }
 

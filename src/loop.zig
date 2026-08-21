@@ -66,7 +66,7 @@ pub fn runTasks(allocator: std.mem.Allocator, io: std.Io, environ: std.process.E
         for (results.items) |r| total_deploys += r.deploys;
         const summary = try std.fmt.allocPrint(allocator, "tasks={d} deploys={d} unhealthy={d}", .{ results.items.len, total_deploys, total_unhealthy });
         defer allocator.free(summary);
-        knowledge.recordBatch(allocator, kb, summary) catch |e| types.logLine(io, "[loop] batch kb save failed: {s}", .{@errorName(e)});
+        knowledge.recordBatch(allocator, kb, summary, cfg.kb_max_lines) catch |e| types.logLine(io, "[loop] batch kb save failed: {s}", .{@errorName(e)});
     }
 
     return results;
