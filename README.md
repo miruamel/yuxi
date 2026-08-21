@@ -1,3 +1,5 @@
+![Yuxi banner](assets/banner.svg)
+
 # Yuxi (玉溪) — Autonomous Software Evolution Engine
 
 A Zig 0.16 orchestrator that takes a task, decomposes it into steps with an LLM,
