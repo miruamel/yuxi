@@ -30,6 +30,12 @@ pub const Ctx = struct {
     /// must not run unattended forever). Null (off) by default. Mirrors the
     /// other autonomy-safety caps (`--max-steps`, `--max-tokens`).
     max_time_ms: ?usize = null,
+    /// Optional cap on self-correction retries for one run. When set, the
+    /// build/eval loop aborts after this many attempts (reuses the existing
+    /// hardcoded-default of 3 when null). Makes the retry budget operator-
+    /// tunable like the other autonomy caps (`--max-steps`, `--max-tokens`,
+    /// `--max-time`) instead of a magic constant. Null (default 3) by default.
+    max_attempts: ?usize = null,
     cache: ?*cache_mod.Cache,
     eval_error: ?[]const u8,
     /// Optional caller-supplied expected stdout (trimmed) for behavioral

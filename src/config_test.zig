@@ -92,6 +92,19 @@ test "config --max-steps is parsed into the plan cap" {
     try std.testing.expectEqual(@as(usize, 4), cfg.max_steps.?);
 }
 
+test "config --max-attempts is parsed into the retry cap" {
+    const io = testIo();
+    // --max-attempts must be parsed into the retry cap, not silently ignored;
+    // null by default preserves the historical 3-attempt budget.
+    const argv = [_][]const u8{ "./yuxi", "--max-attempts", "5", "--mock", "--task", "t" };
+    const cfg = try parseArgs(std.testing.allocator, io, &argv);
+    try std.testing.expectEqual(@as(usize, 5), cfg.max_attempts.?);
+    // Off by default (engine.run falls back to 3).
+    const off = [_][]const u8{ "./yuxi", "--mock", "--task", "t" };
+    const c2 = try parseArgs(std.testing.allocator, io, &off);
+    try std.testing.expect(c2.max_attempts == null);
+}
+
 test "config --max-time is parsed into the wall-clock cap (seconds -> ms)" {
     const io = testIo();
     // --max-time 2 must yield a 2000 ms cap (seconds -> ms), not silently
