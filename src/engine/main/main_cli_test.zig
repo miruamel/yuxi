@@ -92,7 +92,7 @@ test "main --expect gates deploy end-to-end via the CLI flag" {
     // dedicated dir keeps the CLI test hermetic regardless of ordering.
     const wd = "/tmp/yuxi_expect_cli";
     const io = threaded.io();
-    std.Io.Dir.deleteTree(std.Io.Dir.cwd(), io, wd) catch {};
+    std.Io.Dir.deleteTree(std.Io.Dir.cwd(), io, wd) catch |e| if (e != error.FileNotFound) return e;
     // The engine writes gen_*.zig into workdir but does not create it; it must
     // pre-exist (deploy.run's ensureDir runs after the builder writes). Mirror
     // a real operator's checkout by creating it first so the run can deploy.
@@ -112,5 +112,5 @@ test "main --expect gates deploy end-to-end via the CLI flag" {
     defer a.free(bad.stderr);
     try std.testing.expect(bad.term == .exited and bad.term.exited == 1);
 
-    std.Io.Dir.deleteTree(std.Io.Dir.cwd(), io, wd) catch {};
+    std.Io.Dir.deleteTree(std.Io.Dir.cwd(), io, wd) catch |e| if (e != error.FileNotFound) return e;
 }

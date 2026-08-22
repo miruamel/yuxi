@@ -45,7 +45,7 @@ test "engine.run aborts on a rejected plan before codegen" {
     const allocator = std.heap.page_allocator;
     const io = std.Io.Threaded.global_single_threaded.io();
     const workdir = "/tmp/yuxi_plan_gate_test";
-    std.Io.Dir.deleteTree(std.Io.Dir.cwd(), io, workdir) catch {};
+    std.Io.Dir.deleteTree(std.Io.Dir.cwd(), io, workdir) catch |e| if (e != error.FileNotFound) return e;
     try fs.ensureDir(allocator, workdir);
 
     var ctx = try types.Ctx.init(allocator, io, .empty, .no_hitl, .mock, null, "", workdir);
@@ -72,7 +72,7 @@ test "engine.run aborts on a wall-clock cap (--max-time) before deploy" {
     const allocator = std.heap.page_allocator;
     const io = std.Io.Threaded.global_single_threaded.io();
     const workdir = "/tmp/yuxi_maxtime_test";
-    std.Io.Dir.deleteTree(std.Io.Dir.cwd(), io, workdir) catch {};
+    std.Io.Dir.deleteTree(std.Io.Dir.cwd(), io, workdir) catch |e| if (e != error.FileNotFound) return e;
     try fs.ensureDir(allocator, workdir);
 
     var ctx = try types.Ctx.init(allocator, io, .empty, .no_hitl, .mock, null, "", workdir);
@@ -124,7 +124,7 @@ test "engine.run bounds self-correction retries to --max-attempts" {
     const allocator = std.heap.page_allocator;
     const io = std.Io.Threaded.global_single_threaded.io();
     const workdir = "/tmp/yuxi_maxattempts_test";
-    std.Io.Dir.deleteTree(std.Io.Dir.cwd(), io, workdir) catch {};
+    std.Io.Dir.deleteTree(std.Io.Dir.cwd(), io, workdir) catch |e| if (e != error.FileNotFound) return e;
     try fs.ensureDir(allocator, workdir);
 
     var ctx = try types.Ctx.init(allocator, io, .empty, .no_hitl, .mock, null, "", workdir);
@@ -165,7 +165,7 @@ test "engine.run aborts on --max-time from inside the attempt loop" {
     const allocator = std.heap.page_allocator;
     const io = std.Io.Threaded.global_single_threaded.io();
     const workdir = "/tmp/yuxi_maxtime_inloop_test";
-    std.Io.Dir.deleteTree(std.Io.Dir.cwd(), io, workdir) catch {};
+    std.Io.Dir.deleteTree(std.Io.Dir.cwd(), io, workdir) catch |e| if (e != error.FileNotFound) return e;
     try fs.ensureDir(allocator, workdir);
 
     var ctx = try types.Ctx.init(allocator, io, .empty, .no_hitl, .mock, null, "", workdir);

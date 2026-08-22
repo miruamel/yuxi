@@ -12,7 +12,7 @@ test "deploy.run commits a generated artifact and reports true" {
     const alloc = std.heap.page_allocator;
     const io = std.Io.Threaded.global_single_threaded.io();
     const wd = "/tmp/yuxi_deploy_test";
-    std.Io.Dir.deleteTree(std.Io.Dir.cwd(), io, wd) catch {};
+    std.Io.Dir.deleteTree(std.Io.Dir.cwd(), io, wd) catch |e| if (e != error.FileNotFound) return e;
     defer std.Io.Dir.deleteTree(std.Io.Dir.cwd(), io, wd) catch {};
     try fs.ensureDir(alloc, wd);
     const file = try std.fmt.allocPrint(alloc, "{s}/gen_final.zig", .{wd});
@@ -30,7 +30,7 @@ test "deploy.run reports false when the artifact cannot be staged" {
     const alloc = std.heap.page_allocator;
     const io = std.Io.Threaded.global_single_threaded.io();
     const wd = "/tmp/yuxi_deploy_bad_test";
-    std.Io.Dir.deleteTree(std.Io.Dir.cwd(), io, wd) catch {};
+    std.Io.Dir.deleteTree(std.Io.Dir.cwd(), io, wd) catch |e| if (e != error.FileNotFound) return e;
     defer std.Io.Dir.deleteTree(std.Io.Dir.cwd(), io, wd) catch {};
     try fs.ensureDir(alloc, wd);
     var ctx = try types.Ctx.init(alloc, io, .empty, .no_hitl, .mock, null, "", wd);

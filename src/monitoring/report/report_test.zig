@@ -96,7 +96,7 @@ test "monitoring.writeReport composes kb_stats into the report" {
     const allocator = std.heap.page_allocator;
     const io = std.Io.Threaded.global_single_threaded.io();
     const kb = "/tmp/yuxi_kb_stats_report.md";
-    std.Io.Dir.deleteTree(std.Io.Dir.cwd(), io, kb) catch {};
+    std.Io.Dir.deleteTree(std.Io.Dir.cwd(), io, kb) catch |e| if (e != error.FileNotFound) return e;
 
     // No --kb: kb_stats must be null, and the rest of the report is unchanged.
     const r = monitoring.TaskResult{
