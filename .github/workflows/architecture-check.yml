@@ -1,0 +1,58 @@
+name: Architecture Check (§8)
+
+# Enforces the project's hard architectural invariants (AGENTS.md §8) on the
+# files a PR actually touches, rather than the whole tree. This lets the check
+# run today even though master still carries a pre-restructure §8 violation
+# (src/critic/critic.zig, 288 lines) that PR #46 resolves: existing violations
+# are surfaced the moment they are touched, not used to block unrelated work.
+# After #46 merges, master satisfies §8 and this check guards every future PR.
+#
+# Invariants checked (AGENTS.md §8):
+#   - no source file exceeds ~200 lines of code
+#   - no directory holds more than five direct files
+# Deep vertical nesting is the project's defining priority; this is the
+# automated backstop that keeps a violating file or directory from merging.
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  invariants:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check changed .zig files against §8 invariants
+        run: |
+          set -euo pipefail
+          base="${{ github.event.pull_request.base.sha }}"
+          changed="$(git diff --name-only "${base}...HEAD" | grep -E '\.zig$' || true)"
+          if [ -z "$changed" ]; then
+            echo "No .zig files changed in this PR; nothing to check."
+            exit 0
+          fi
+          violations=0
+          max_sloc=200
+          max_files=5
+          while IFS= read -r f; do
+            [ -f "$f" ] || continue
+            lines="$(wc -l < "$f")"
+            if [ "$lines" -gt "$max_sloc" ]; then
+              echo "::error::VIOLATION: $f has $lines lines (> $max_sloc)"
+              violations=$((violations + 1))
+            fi
+            dir="$(dirname "$f")"
+            count="$(find "$dir" -maxdepth 1 -type f | wc -l)"
+            if [ "$count" -gt "$max_files" ]; then
+              echo "::error::VIOLATION: $dir has $count direct files (> $max_files)"
+              violations=$((violations + 1))
+            fi
+          done <<< "$changed"
+          if [ "$violations" -gt 0 ]; then
+            echo "::error::$violations §8 invariant violation(s) found in changed files"
+            exit 1
+          fi
+          echo "§8 invariants satisfied for all changed .zig files."
