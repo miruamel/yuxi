@@ -37,17 +37,28 @@ jobs:
           violations=0
           max_sloc=200
           max_files=5
+          declare -A checked_dirs
           while IFS= read -r f; do
             [ -f "$f" ] || continue
-            lines="$(wc -l < "$f")"
+            # SLOC invariant applies to source files (already filtered to .zig).
+            lines="$(awk 'END{print NR}' "$f")"   # counts actual lines, not newlines
             if [ "$lines" -gt "$max_sloc" ]; then
               echo "::error::VIOLATION: $f has $lines lines (> $max_sloc)"
               violations=$((violations + 1))
             fi
+            # Directory file-count invariant: project root is src/ (AGENTS.md §8),
+            # not the repo root. Skip repo-root files (e.g. build.zig) so the
+            # check doesn't count the entire repo root as one directory.
             dir="$(dirname "$f")"
-            count="$(find "$dir" -maxdepth 1 -type f | wc -l)"
+            [ "$dir" = "." ] && continue
+            # Dedupe: a directory touched by several changed files is checked once.
+            [ -n "${checked_dirs[$dir]:-}" ] && continue
+            checked_dirs[$dir]=1
+            # Count only .zig source files; docs/tests in the same dir don't
+            # count against the source-organization cap.
+            count="$(find "$dir" -maxdepth 1 -type f -name '*.zig' | wc -l)"
             if [ "$count" -gt "$max_files" ]; then
-              echo "::error::VIOLATION: $dir has $count direct files (> $max_files)"
+              echo "::error::VIOLATION: $dir has $count .zig files (> $max_files)"
               violations=$((violations + 1))
             fi
           done <<< "$changed"
