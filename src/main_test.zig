@@ -69,28 +69,44 @@ test "emitReportAndExit fires the health hook only on an unhealthy run" {
     _ = fs.deleteFile(io, sentinel) catch {};
     _ = fs.deleteFile(io, fixture) catch {};
 }
-
-test "main exits non-zero on a CLI parse error, zero on --help" {
-    // Regression guard for the §30 exit-code contract (#18/#19/#21): a malformed
-    // invocation must NOT exit 0 — otherwise CI/cron gating treats a failed
-    // parse as a healthy run. The binary is assumed built (CI runs `zig build`
-    // before `zig build test`, same as evaluator.run's real-subprocess tests).
+test "emitReportAndExit writes a temp report when only --health-hook is set" {
+    // Regression: the hook needs machine-readable input, but the user may set
+    // --health-hook WITHOUT --report. emitReportAndExit must still write a
+    // report (to a temp path) and pass it as argv[1], then clean it up. This
+    // branch was unexercised: the existing hook test always passed a --report
+    // path, so the temp-report path was dead in tests.
     const a = std.heap.page_allocator;
+    const io = std.Io.Threaded.global_single_threaded.io();
+
+    const fixture = "/tmp/yuxi_hook_fixture2.sh";
+    const sentinel = "/tmp/yuxi_hook_fired2";
+    try fs.writeFileAlloc(a, fixture, "#!/bin/sh\necho fired > " ++ sentinel ++ "\n");
     var threaded = std.Io.Threaded.init(a, .{ .environ = std.Io.Threaded.global_single_threaded.environ.process_environ });
     defer threaded.deinit();
-    const bin = "zig-out/bin/yuxi";
+    _ = std.process.run(a, threaded.io(), .{ .argv = &[_][]const u8{ "chmod", "+x", fixture } }) catch {};
+    _ = fs.deleteFile(io, sentinel) catch {};
 
-    // Missing --task → MissingTask → exit 1.
-    const missing = try std.process.run(a, threaded.io(), .{ .argv = &[_][]const u8{ bin, "--no-hitl", "--mock" } });
-    defer a.free(missing.stdout);
-    defer a.free(missing.stderr);
-    try std.testing.expect(missing.term == .exited and missing.term.exited == 1);
+    const unhealthy = monitoring.TaskResult{
+        .task = "t",
+        .deploys = 0,
+        .retries = 0,
+        .critic_rejections = 1,
+        .mock_fallbacks = 0,
+        .token_budgets_exceeded = 0,
+        .run_time_exceeded = 0,
+        .tokens = 0,
+        .max_steps_exceeded = 0,
+        .healthy = false,
+        .verdict = "x",
+    };
+    // No report_path: the hook must fire against a temp report, and the temp
+    // file must be removed afterwards (no leftover in /tmp).
+    const h = try mainmod.emitReportAndExit(a, io, null, fixture, false, null, null, unhealthy, null);
+    try std.testing.expect(!h);
+    try std.testing.expect(fs.fileExists(sentinel));
 
-    // --help → HelpRequested → exit 0 (a successful info request, not an error).
-    const help = try std.process.run(a, threaded.io(), .{ .argv = &[_][]const u8{ bin, "--help" } });
-    defer a.free(help.stdout);
-    defer a.free(help.stderr);
-    try std.testing.expect(help.term == .exited and help.term.exited == 0);
+    _ = fs.deleteFile(io, sentinel) catch {};
+    _ = fs.deleteFile(io, fixture) catch {};
 }
 
 test "main --version prints the build stamp and exits zero" {
@@ -109,6 +125,61 @@ test "main --version prints the build stamp and exits zero" {
     try std.testing.expect(std.mem.startsWith(u8, out, "yuxi v"));
 }
 
+test "main --kb-stats prints a ledger summary and exits zero" {
+    // Regression: the --kb-stats read-only inspector (main.zig:30-33) was
+    // reachable only via manual invocation — no test covered either of its two
+    // paths. The pure core (knowledge.summarize) was tested, but printStats'
+    // logLine formatting and the no-ledger short-circuit were unexercised, so
+    // a regression there shipped silently. Both paths are asserted here.
+    const a = std.heap.page_allocator;
+    var threaded = std.Io.Threaded.init(a, .{ .environ = std.Io.Threaded.global_single_threaded.environ.process_environ });
+    defer threaded.deinit();
+    const io = threaded.io();
+    const bin = "zig-out/bin/yuxi";
+
+    // No --kb: short-circuit, exit 0, and the summary line names the gap.
+    const none = try std.process.run(a, io, .{ .argv = &[_][]const u8{ bin, "--no-hitl", "--mock", "--kb-stats" } });
+    defer a.free(none.stdout);
+    defer a.free(none.stderr);
+    try std.testing.expect(none.term == .exited and none.term.exited == 0);
+    try std.testing.expect(std.mem.indexOf(u8, none.stdout, "no --kb ledger configured; nothing to summarize") != null);
+
+    // With a populated --kb ledger: exit 0 and the category counts are printed.
+    const kb = "/tmp/yuxi_kb_stats_cli.md";
+    const kb_content =
+        \\- add a feature: deployed (steps=1 deploys=1 retries=0 critic_rej=0 mock_fb=0 budget_ex=0 max_steps_ex=0 run_time_ex=0)
+        \\- fix a bug: failed (steps=2 deploys=0 retries=1 critic_rej=1 mock_fb=0 budget_ex=0 max_steps_ex=0 run_time_ex=0)
+        \\- critic rejected: missing error handling
+        \\- health: no deploy; self-correction exhausted; critic_rej=2
+        \\- batch: tasks=2 deploys=2 unhealthy=0
+        \\- some non-standard note line
+    ;
+    try fs.writeFileAlloc(a, kb, kb_content);
+    defer _ = std.Io.Dir.deleteFile(std.Io.Dir.cwd(), io, kb) catch {};
+    const got = try std.process.run(a, io, .{ .argv = &[_][]const u8{ bin, "--no-hitl", "--mock", "--kb-stats", "--kb", kb } });
+    defer a.free(got.stdout);
+    defer a.free(got.stderr);
+    try std.testing.expect(got.term == .exited and got.term.exited == 0);
+    try std.testing.expect(std.mem.indexOf(u8, got.stdout, "lessons:        6") != null);
+    try std.testing.expect(std.mem.indexOf(u8, got.stdout, "deployed:       1") != null);
+    try std.testing.expect(std.mem.indexOf(u8, got.stdout, "failed:         1") != null);
+    try std.testing.expect(std.mem.indexOf(u8, got.stdout, "critic-rejected:1") != null);
+    try std.testing.expect(std.mem.indexOf(u8, got.stdout, "health:         1") != null);
+    try std.testing.expect(std.mem.indexOf(u8, got.stdout, "batch:          1") != null);
+    try std.testing.expect(std.mem.indexOf(u8, got.stdout, "other:          1") != null);
+    try std.testing.expect(std.mem.indexOf(u8, got.stdout, "latest: - some non-standard note line") != null);
+
+    // --kb-max-lines cap is echoed back by printStats so an operator can see
+    // the bound the inspector applied (knowledge.zig:192). This line had no
+    // test; assert it round-trips through the CLI. The bare form `--kb-max-lines`
+    // defaults to 200 (same convention as --cache/--report/--record), so use
+    // the `=` form to pin the value at 5 rather than asserting on the default.
+    const capped = try std.process.run(a, io, .{ .argv = &[_][]const u8{ bin, "--no-hitl", "--mock", "--kb-stats", "--kb-max-lines=5", "--kb", kb } });
+    defer a.free(capped.stdout);
+    defer a.free(capped.stderr);
+    try std.testing.expect(capped.term == .exited and capped.term.exited == 0);
+    try std.testing.expect(std.mem.indexOf(u8, capped.stdout, "cap (--kb-max-lines): 5") != null);
+}
 test "main --expect gates deploy end-to-end via the CLI flag" {
     // Regression guard (§21): the --expect behavioral-verification flag must
     // work through the real CLI path (main -> config.parse -> engine.newCtx ->

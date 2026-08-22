@@ -3,6 +3,15 @@ const types = @import("types");
 const engine = @import("engine");
 const transport = @import("transport");
 const fs = @import("fs");
+/// Unique-per-call monotonic suffix so engine-run tests get isolated workdirs
+/// and never collide with a stale `.git` left by a prior run in the same fixed
+/// `/tmp` path (the documented test-hermeticity gotcha: a leftover `.git`
+/// poisons the deploy commit and makes the run report deploys==0).
+fn tsSuffix() u64 {
+    var ts: std.os.linux.timespec = undefined;
+    _ = std.os.linux.clock_gettime(std.os.linux.CLOCK.MONOTONIC, &ts);
+    return @as(u64, @intCast(ts.sec)) * std.time.ns_per_s + @as(u64, @intCast(ts.nsec));
+}
 
 test "transport.complete serves recorded responses in order (offline replay)" {
     const allocator = std.testing.allocator;
@@ -77,8 +86,11 @@ test "transport.complete falls back to mock when replay runs out (offline resili
 test "engine.run drives the real openai backend offline via --replay" {
     const allocator = std.heap.page_allocator;
     const io = std.Io.Threaded.global_single_threaded.io();
-    const workdir = "/tmp/yuxi_replay_e2e";
-    const replay_path = "/tmp/yuxi_replay_e2e.md";
+    const uniq = tsSuffix();
+    var wdbuf: [64]u8 = undefined;
+    const workdir = try std.fmt.bufPrint(&wdbuf, "/tmp/yuxi_replay_e2e_{d}", .{uniq});
+    var rpbuf: [64]u8 = undefined;
+    const replay_path = try std.fmt.bufPrint(&rpbuf, "/tmp/yuxi_replay_e2e_{d}.md", .{uniq});
     try fs.ensureDir(allocator, workdir);
 
     // 8 recorded entries in the engine's exact call order: decomposer, plan
@@ -139,8 +151,10 @@ test "engine.run records a replay-compatible transcript (mock capture -> offline
     // output, closing the record/replay loop end-to-end.
     const allocator = std.heap.page_allocator;
     const io = std.Io.Threaded.global_single_threaded.io();
+    const uniq2 = tsSuffix();
     const rec_path = "/tmp/yuxi_record_e2e.txt";
-    const workdir = "/tmp/yuxi_record_run";
+    var wdbuf2: [64]u8 = undefined;
+    const workdir = try std.fmt.bufPrint(&wdbuf2, "/tmp/yuxi_record_run_{d}", .{uniq2});
     fs.deleteFile(io, rec_path) catch {};
     try fs.ensureDir(allocator, workdir);
 

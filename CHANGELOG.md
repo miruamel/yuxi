@@ -108,6 +108,76 @@ neither reached the ledger the way the two earlier autonomy caps did.
 - CI (`ci.yml`) already used `-j2`; the fix is purely documentation, no
   behavior change. `zig build -j2` and `zig build test -j2` both exit 0.
 
+### `--kb-stats` CLI path now covered end-to-end (test, §11/§21) [`3b716e0`]
+- `knowledge.printStats` (main.zig:30-33) had no test at all — only its pure core
+  `knowledge.summarize` was covered, and its `logLine` formatting plus the
+  no-ledger short-circuit were unexercised. New CLI-shell test asserts both
+  paths: no `--kb` short-circuits with "nothing to summarize" and exit 0; a
+  populated ledger prints all six category counts and the latest line. The
+  unreadable-ledger path stays untested: `store.load` returns null for a missing
+  file, so the "ledger empty" branch is unreachable in the test sandbox —
+  documented, not chased. (The `--kb-max-lines` cap echo was NOT covered here;
+  that assertion landed in `7aa179f` after this entry was written.) All 5
+  `main_test` roots pass.
+### `assessHealth` `max_steps_exceeded` clause covered (test, §11/§30) [`f1a540a`]
+- The `--max-steps` abort verdict clause (monitoring.zig:174-178) had the same
+  gap as the `run_time_exceeded` clause closed earlier: the unhealthy-cycle
+  test sets critic_rejections/mock_fallbacks/retries/token_budgets but never
+  `max_steps_exceeded`, so the branch was dead in tests. New test sets
+  `ctx.deploys=1` + `ctx.max_steps_exceeded=1` and asserts the verdict carries
+  "max-steps exceeded" and NOT "no deploy", proving the plan-cap abort is a
+  distinct health signal (not folded into the generic no-deploy WARN). All 7
+  `monitoring_test` roots pass.
+### `--kb-stats` short-circuit dropped the `--kb-max-lines` cap (fix, reliability, §11/§12)
+- `config.parse` short-circuited on `--kb-stats` and returned a struct with
+  `kb_max_lines = null` (config.zig:130-131), so `knowledge.printStats` never
+  reached its cap-echo line (knowledge.zig:192) — an operator who passed
+  `--kb-max-lines` to the inspector saw the same output as one who didn't.
+  The short-circuit now returns the parsed cap (bare form still defaults to
+  200, matching `--cache`/`--report`/`--record`). New `--kb-max-lines=5`
+  assertion in `main_test` covers the populated-ledger cap echo.
+### `emitReportAndExit` temp-report path covered (test, §11/§21) [`b5a7d89`]
+- `main.emitReportAndExit` writes a temp report and passes it to the health hook
+  when the caller sets `--health-hook` WITHOUT `--report`. The existing hook test
+  always supplied a `--report` path, so that branch was dead in tests — a
+  regression there would have meant a hook firing with no machine-readable
+  input. New test passes `report_path=null` + an unhealthy `TaskResult` and
+  asserts the hook fires (sentinel written) and the temp report is cleaned up
+  afterwards. All 4 `main_test` roots pass.
+### `--kb-stats` echoes the `--kb-max-lines` cap (test, §11/§21) [`7aa179f`]
+- `knowledge.printStats` logs the bound it applied (knowledge.zig:192) so an
+  operator can see it, but no test round-tripped it through the CLI. New
+  assertion runs `--kb-stats --kb-max-lines=5` against the populated ledger
+  and expects the `cap (--kb-max-lines): 5` line in stdout, exit 0.
+### `--record`/`--replay` loop completed with idempotent deploy fix (feat, reliability, §11/§12/§30)
+- The `--record` capture logic (plumbed in `transport.zig` but never activated) and the
+  `--replay`-compatible e2e tests (in `transport_test.zig` but never wired into
+  `build.zig`) were both present but dead — the record/replay loop could not
+  be exercised end-to-end. Wired both into the test suite via `build.zig`.
+- `deploy.run` treated "nothing added to commit but untracked files present" as
+  a failure instead of an idempotent re-run. When the same workdir is reused
+  for a record run (mock) followed by a replay run (openai), the second run's
+  engine execution writes fragment files (`gen_0/1/2.zig`) as untracked files
+  before `deploy.run` stages only `gen_final.zig`. Git then reports "nothing
+  added to commit but untracked files present" (exit 1), not the clean
+  "nothing to commit, working tree clean". Expanded the idempotent-detection
+  to match both phrases, so a record→replay sequence in the same workdir
+  correctly reports `deploys=1` for both runs.
+- Added `tsSuffix()` hermetic workdir generator to `transport_test.zig` (fixes
+  the documented test-hermeticity gotcha: stale `.git` in a fixed `/tmp` path
+  poisons the deploy commit). All 23 test roots pass (`zig build test -j2`).
+- Files: `build.zig`, `src/deploy/deploy.zig`, `src/llm/transport.zig`,
+  `src/llm/transport_test.zig`.
+### `monitoring_test.zig` decomposed per §8 SLOC cap (refactor, §8/§17)
+- The 228-line test file exceeded the 200 SLOC hard invariant. Split into two
+  focused test modules under `src/monitoring/`:
+  - `health_test.zig` (90 lines): four `assessHealth` tests covering unhealthy
+    cycles, wall-clock cap, max-steps cap, and healthy cycles.
+  - `report_test.zig` (143 lines): three `writeReport` tests covering verdict
+    emission + JSON escaping, token/max-steps exposure, and KB stats
+    composition.
+- Removed `monitoring_test.zig`; updated `build.zig` test_files. All 24 test
+  roots pass, `zig fmt --check src` clean.
 ### Human / Other Contributions
 - (none this cycle)
 

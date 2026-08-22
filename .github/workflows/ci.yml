@@ -25,3 +25,21 @@ jobs:
         run: zig build test -j2
       - name: Format check
         run: zig fmt --check src
+
+  security-hardening:
+    name: Security Hardening
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+      - name: Setup Zig
+        uses: mlugg/setup-zig@v2
+        with:
+          version: 0.16.0
+      - name: Build with Thread Sanitizer
+        run: zig build -j2 -Dsanitize-thread=true
+      - name: Test with Thread Sanitizer
+        run: zig build test -j2 -Dsanitize-thread=true
+

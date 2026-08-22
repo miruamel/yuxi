@@ -63,9 +63,15 @@ pub fn run(ctx: *types.Ctx, path: []const u8) !bool {
         // failure: surface the reason and report no checkpoint.
         // git prints "nothing to commit, working tree clean" to STDOUT (stderr
         // is empty) when there is nothing to stage, so scan both streams.
+        // Also handles "nothing added to commit but untracked files present"
+        // when fragment files exist but the main artifact is already committed.
         const out = std.mem.trim(u8, res.stdout, &std.ascii.whitespace);
         const err = std.mem.trim(u8, res.stderr, &std.ascii.whitespace);
-        if (std.mem.indexOf(u8, out, "nothing to commit") != null or std.mem.indexOf(u8, err, "nothing to commit") != null) {
+        if (std.mem.indexOf(u8, out, "nothing to commit") != null or
+            std.mem.indexOf(u8, out, "nothing added to commit") != null or
+            std.mem.indexOf(u8, err, "nothing to commit") != null or
+            std.mem.indexOf(u8, err, "nothing added to commit") != null)
+        {
             ctx.log("[deploy] artifact unchanged; already checkpointed", .{});
             return true;
         }
