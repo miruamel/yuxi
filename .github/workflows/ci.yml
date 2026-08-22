@@ -26,28 +26,20 @@ jobs:
       - name: Format check
         run: zig fmt --check src
 
-  codeql-analysis:
-    name: CodeQL Analysis
+  security-hardening:
+    name: Security Hardening
     runs-on: ubuntu-latest
-    permissions:
-      actions: read
-      contents: read
-      security-events: write
-    strategy:
-      fail-fast: false
-      matrix:
-        language: [zig]
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
           fetch-tags: true
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
+      - name: Setup Zig
+        uses: mlugg/setup-zig@v2
         with:
-          languages: ${{ matrix.language }}
-      - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
-        with:
-          category: "/language:${{ matrix.language }}"
+          version: 0.16.0
+      - name: Build with Thread Sanitizer
+        run: zig build -j2 -Dsanitize-thread=true
+      - name: Test with Thread Sanitizer
+        run: zig build test -j2 -Dsanitize-thread=true
+
