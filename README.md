@@ -44,7 +44,7 @@ the gate itself. See `AGENTS.md` for the full observability surface.
 ## Pipeline
 
 ```
-Gateway -> Orchestrator -> (Builder -> Critic)* -> Compose -> Evaluator -> Deploy
+Gateway -> Orchestrator -> Plan Gate -> (Builder -> Critic)* -> Compose -> Evaluator -> Deploy
                                           ^                          |
                                           \________ Resilience <- Knowledge <- Monitoring
 ```

@@ -4,63 +4,95 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
     const sanitize_thread = b.option(bool, "sanitize-thread", "Enable Thread Sanitizer") orelse false;
-    // Every source file is a public named module (issue #3). Zig 0.16 only
-    // collects `test` blocks from the root module of a test build, and a
-    // sub-directory test file's relative imports may not escape its own
-    // directory, so all imports use module names. `addModule` registers the
-    // module; each consumer must `addImport` it (no implicit global scope).
-    const types = b.addModule("types", .{ .root_source_file = b.path("src/core/types.zig"), .target = target, .optimize = optimize, .sanitize_thread = sanitize_thread });
-    const compose = b.addModule("compose", .{ .root_source_file = b.path("src/core/compose.zig"), .target = target, .optimize = optimize, .sanitize_thread = sanitize_thread });
-    const config = b.addModule("config", .{ .root_source_file = b.path("src/core/config/config.zig"), .target = target, .optimize = optimize, .sanitize_thread = sanitize_thread });
-    const engine = b.addModule("engine", .{ .root_source_file = b.path("src/core/engine.zig"), .target = target, .optimize = optimize, .sanitize_thread = sanitize_thread });
-    const step = b.addModule("step", .{ .root_source_file = b.path("src/core/step.zig"), .target = target, .optimize = optimize, .sanitize_thread = sanitize_thread });
-    const runlife = b.addModule("runlife", .{ .root_source_file = b.path("src/core/runlife.zig"), .target = target, .optimize = optimize, .sanitize_thread = sanitize_thread });
-    const gateway = b.addModule("gateway", .{ .root_source_file = b.path("src/gateway/gateway.zig"), .target = target, .optimize = optimize, .sanitize_thread = sanitize_thread });
-    const orchestrator = b.addModule("orchestrator", .{ .root_source_file = b.path("src/orchestrator/orchestrator.zig"), .target = target, .optimize = optimize, .sanitize_thread = sanitize_thread });
-    const evaluator = b.addModule("evaluator", .{ .root_source_file = b.path("src/evaluator/evaluator.zig"), .target = target, .optimize = optimize, .sanitize_thread = sanitize_thread });
-    const deploy = b.addModule("deploy", .{ .root_source_file = b.path("src/deploy/deploy.zig"), .target = target, .optimize = optimize, .sanitize_thread = sanitize_thread });
-    const resilience = b.addModule("resilience", .{ .root_source_file = b.path("src/resilience/resilience.zig"), .target = target, .optimize = optimize, .sanitize_thread = sanitize_thread });
-    const knowledge = b.addModule("knowledge", .{ .root_source_file = b.path("src/knowledge/knowledge.zig"), .target = target, .optimize = optimize, .sanitize_thread = sanitize_thread });
-    const store = b.addModule("store", .{ .root_source_file = b.path("src/knowledge/store.zig"), .target = target, .optimize = optimize, .sanitize_thread = sanitize_thread });
-    const monitoring = b.addModule("monitoring", .{ .root_source_file = b.path("src/monitoring/monitoring.zig"), .target = target, .optimize = optimize, .sanitize_thread = sanitize_thread });
-    const report_kb_stats = b.addModule("report_kb_stats", .{ .root_source_file = b.path("src/monitoring/report_kb_stats.zig"), .target = target, .optimize = optimize, .sanitize_thread = sanitize_thread });
-    const fs = b.addModule("fs", .{ .root_source_file = b.path("src/util/fs.zig"), .target = target, .optimize = optimize, .sanitize_thread = sanitize_thread });
-    const cache = b.addModule("cache", .{ .root_source_file = b.path("src/util/cache.zig"), .target = target, .optimize = optimize, .sanitize_thread = sanitize_thread });
-    const builder = b.addModule("builder", .{ .root_source_file = b.path("src/builder/builder.zig"), .target = target, .optimize = optimize, .sanitize_thread = sanitize_thread });
-    const critic = b.addModule("critic", .{ .root_source_file = b.path("src/critic/critic.zig"), .target = target, .optimize = optimize, .sanitize_thread = sanitize_thread });
-    const transport = b.addModule("transport", .{ .root_source_file = b.path("src/llm/transport.zig"), .target = target, .optimize = optimize, .sanitize_thread = sanitize_thread });
-    const http = b.addModule("http", .{ .root_source_file = b.path("src/llm/http.zig"), .target = target, .optimize = optimize, .sanitize_thread = sanitize_thread });
-    const replay = b.addModule("replay", .{ .root_source_file = b.path("src/llm/replay.zig"), .target = target, .optimize = optimize, .sanitize_thread = sanitize_thread });
-    const loop = b.addModule("loop", .{ .root_source_file = b.path("src/loop.zig"), .target = target, .optimize = optimize, .sanitize_thread = sanitize_thread });
-    // Build-time version stamp (§28). Detected via `git describe` so a release
-    // tag flows into the binary automatically; fall back to "" when git history
-    // is unavailable (e.g. a shallow/code-only tarball build) rather than
-    // failing the whole build. `b.run` (runAllowFail) only fatal on spawn
-    // error, not a non-zero git exit, so a missing tag/shallow clone yields "".
+
+    // Engine modules
+    const engine_types = b.addModule("types", .{ .root_source_file = b.path("src/engine/types/types.zig"), .target = target, .optimize = optimize, .sanitize_thread = sanitize_thread });
+    const engine_config = b.addModule("config", .{ .root_source_file = b.path("src/engine/config/config.zig"), .target = target, .optimize = optimize, .sanitize_thread = sanitize_thread });
+    const engine_compose = b.addModule("compose", .{ .root_source_file = b.path("src/engine/compose/compose.zig"), .target = target, .optimize = optimize, .sanitize_thread = sanitize_thread });
+    const engine_engine = b.addModule("engine", .{ .root_source_file = b.path("src/engine/engine.zig"), .target = target, .optimize = optimize, .sanitize_thread = sanitize_thread });
+    const engine_step = b.addModule("step", .{ .root_source_file = b.path("src/engine/step/step.zig"), .target = target, .optimize = optimize, .sanitize_thread = sanitize_thread });
+    const engine_runlife = b.addModule("runlife", .{ .root_source_file = b.path("src/engine/runlife/runlife.zig"), .target = target, .optimize = optimize, .sanitize_thread = sanitize_thread });
+    const engine_loop = b.addModule("loop", .{ .root_source_file = b.path("src/engine/loop/loop.zig"), .target = target, .optimize = optimize, .sanitize_thread = sanitize_thread });
+    const engine_main = b.addModule("mainmod", .{ .root_source_file = b.path("src/engine/main/main.zig"), .target = target, .optimize = optimize, .sanitize_thread = sanitize_thread });
+
+    // LLM modules
+    const llm_transport = b.addModule("transport", .{ .root_source_file = b.path("src/llm/transport/transport.zig"), .target = target, .optimize = optimize, .sanitize_thread = sanitize_thread });
+    const llm_http = b.addModule("http", .{ .root_source_file = b.path("src/llm/transport/http/http.zig"), .target = target, .optimize = optimize, .sanitize_thread = sanitize_thread });
+    const llm_replay = b.addModule("replay", .{ .root_source_file = b.path("src/llm/replay/replay.zig"), .target = target, .optimize = optimize, .sanitize_thread = sanitize_thread });
+
+    // Orchestrator modules
+    const orchestrator_decompose = b.addModule("orchestrator", .{ .root_source_file = b.path("src/orchestrator/decompose/decompose.zig"), .target = target, .optimize = optimize, .sanitize_thread = sanitize_thread });
+
+    // Builder modules
+    const builder_generate = b.addModule("builder", .{ .root_source_file = b.path("src/builder/generate/generate.zig"), .target = target, .optimize = optimize, .sanitize_thread = sanitize_thread });
+
+    // Critic modules
+    const critic_denylist = b.addModule("critic", .{ .root_source_file = b.path("src/critic/denylist/denylist.zig"), .target = target, .optimize = optimize, .sanitize_thread = sanitize_thread });
+
+    // Evaluator modules
+    const evaluator_compile = b.addModule("evaluator", .{ .root_source_file = b.path("src/evaluator/compile/compile.zig"), .target = target, .optimize = optimize, .sanitize_thread = sanitize_thread });
+
+    // Deploy modules
+    const deploy_commit = b.addModule("deploy", .{ .root_source_file = b.path("src/deploy/commit/commit.zig"), .target = target, .optimize = optimize, .sanitize_thread = sanitize_thread });
+
+    // Gateway modules
+    const gateway_auth = b.addModule("gateway", .{ .root_source_file = b.path("src/gateway/auth/auth.zig"), .target = target, .optimize = optimize, .sanitize_thread = sanitize_thread });
+
+    // Knowledge modules
+    const knowledge_ledger = b.addModule("knowledge", .{ .root_source_file = b.path("src/knowledge/ledger/ledger.zig"), .target = target, .optimize = optimize, .sanitize_thread = sanitize_thread });
+    const knowledge_store = b.addModule("store", .{ .root_source_file = b.path("src/knowledge/store/store.zig"), .target = target, .optimize = optimize, .sanitize_thread = sanitize_thread });
+
+    // Monitoring modules
+    const monitoring_health = b.addModule("monitoring", .{ .root_source_file = b.path("src/monitoring/health/health.zig"), .target = target, .optimize = optimize, .sanitize_thread = sanitize_thread });
+    const monitoring_report_kb_stats = b.addModule("report_kb_stats", .{ .root_source_file = b.path("src/monitoring/report/report_kb_stats.zig"), .target = target, .optimize = optimize, .sanitize_thread = sanitize_thread });
+
+    // Resilience modules
+    const resilience_fallback = b.addModule("resilience", .{ .root_source_file = b.path("src/resilience/fallback/fallback.zig"), .target = target, .optimize = optimize, .sanitize_thread = sanitize_thread });
+
+    // Util modules
+    const util_fs = b.addModule("fs", .{ .root_source_file = b.path("src/util/fs/fs.zig"), .target = target, .optimize = optimize, .sanitize_thread = sanitize_thread });
+    const util_cache = b.addModule("cache", .{ .root_source_file = b.path("src/util/cache/cache.zig"), .target = target, .optimize = optimize, .sanitize_thread = sanitize_thread });
+
+    // Build-time version stamp
     const raw_version = b.run(&[_][]const u8{ "git", "describe", "--tags", "--always", "--dirty" });
-    // git describe prints a trailing newline; trim it so the version stamp is
-    // a clean token with no embedded control char in the report/--version.
     const version_stamp = std.mem.trim(u8, raw_version, "\r\n");
     const version_opt = b.addOptions();
     version_opt.addOption([]const u8, "version", version_stamp);
     const bopt = b.createModule(.{ .root_source_file = version_opt.getOutput(), .target = target, .optimize = optimize, .sanitize_thread = sanitize_thread });
 
-    const mainmod = b.addModule("mainmod", .{ .root_source_file = b.path("src/main.zig"), .target = target, .optimize = optimize, .sanitize_thread = sanitize_thread });
-
     const all = [_]*std.Build.Module{
-        types,      config,    compose, engine,     step,            gateway, orchestrator, evaluator, deploy,
-        resilience, knowledge, store,   monitoring, report_kb_stats, fs,      cache,        builder,   critic,
-        transport,  replay,    http,    runlife,    loop,            mainmod, bopt,
+        engine_types,      engine_config,    engine_compose, engine_engine,     engine_step,
+        engine_runlife,    engine_loop,      engine_main,
+        llm_transport,     llm_http,         llm_replay,
+        orchestrator_decompose,
+        builder_generate,
+        critic_denylist,
+        evaluator_compile,
+        deploy_commit,
+        gateway_auth,
+        knowledge_ledger,  knowledge_store,
+        monitoring_health, monitoring_report_kb_stats,
+        resilience_fallback,
+        util_fs,           util_cache,
+        bopt,
     };
     const all_names = [_][]const u8{
-        "types",      "config",    "compose", "engine",     "step",            "gateway", "orchestrator",  "evaluator", "deploy",
-        "resilience", "knowledge", "store",   "monitoring", "report_kb_stats", "fs",      "cache",         "builder",   "critic",
-        "transport",  "replay",    "http",    "runlife",    "loop",            "mainmod", "build_options",
+        "types",           "config",         "compose",       "engine",          "step",
+        "runlife",         "loop",           "mainmod",
+        "transport",       "http",           "replay",
+        "orchestrator",
+        "builder",
+        "critic",
+        "evaluator",
+        "deploy",
+        "gateway",
+        "knowledge",       "store",
+        "monitoring",      "report_kb_stats",
+        "resilience",
+        "fs",              "cache",
+        "build_options",
     };
 
-    // The dependency graph is a DAG, so wiring every module to every other
-    // (except itself) introduces no cycle. This keeps build.zig honest and
-    // removes the need to maintain a per-file import list by hand.
     for (all) |m| {
         for (all, all_names) |other, name| {
             if (m != other) m.addImport(name, other);
@@ -68,7 +100,7 @@ pub fn build(b: *std.Build) void {
     }
 
     const exe_mod = b.createModule(.{
-        .root_source_file = b.path("src/main.zig"),
+        .root_source_file = b.path("src/engine/main/main.zig"),
         .target = target,
         .optimize = optimize,
         .sanitize_thread = sanitize_thread,
@@ -77,44 +109,58 @@ pub fn build(b: *std.Build) void {
     const exe = b.addExecutable(.{ .name = "yuxi", .root_module = exe_mod });
     b.installArtifact(exe);
 
+    // Benchmark step
+    const bench_step = b.step("bench", "Run performance benchmarks");
+    const bench_files = [_][]const u8{
+        "src/orchestrator/bench/bench.zig",
+        "src/critic/bench/bench.zig",
+        "src/evaluator/bench/bench.zig",
+    };
+    for (bench_files) |bf| {
+        const bmod = b.createModule(.{ .root_source_file = b.path(bf), .target = target, .optimize = optimize, .sanitize_thread = sanitize_thread });
+        for (all, all_names) |other, name| bmod.addImport(name, other);
+        const bt = b.addTest(.{ .root_module = bmod });
+        const run_bt = std.Build.Step.Run.create(b, b.fmt("bench {s}", .{bf}));
+        run_bt.addArtifactArg(bt);
+        run_bt.stdio = .inherit;
+        bench_step.dependOn(&run_bt.step);
+    }
+
     const test_step = b.step("test", "Run unit tests");
     const test_files = [_][]const u8{
-        "src/builder/builder.zig",
-        "src/builder/builder_test.zig",
-        "src/config_test.zig",
-        "src/core/compose.zig",
-        "src/core/selfcorr/gate_test.zig",
-        "src/core/selfcorr/recovery_test.zig",
-        "src/core/selfcorr/plan_gate_test.zig",
-        "src/critic/critic.zig",
-        "src/evaluator/evaluator.zig",
-        "src/deploy/deploy_test.zig",
-        "src/knowledge/recorders_test.zig",
-        "src/knowledge/store_test.zig",
-        "src/knowledge/summarize_test.zig",
-        "src/llm/http.zig",
-        "src/llm/transport_test.zig",
-        "src/monitoring/health_test.zig",
-        "src/monitoring/report_test.zig",
-        "src/util/fs.zig",
-        "src/main_test.zig",
-        "src/orchestrator/orchestrator_test.zig",
+        "src/builder/generate/generate.zig",
+        "src/builder/generate/generate_test.zig",
+        "src/engine/config/config_test.zig",
+        "src/engine/compose/compose.zig",
+        "src/engine/loop/loop.zig",
+        "src/engine/loop/loop_test.zig",
+        "src/engine/selfcorr/recovery/recovery_test.zig",
+        "src/engine/selfcorr/gate/gate_test.zig",
+        "src/engine/selfcorr/plan_gate/plan_gate_test.zig",
+        "src/critic/denylist/denylist_test.zig",
+        "src/evaluator/compile/compile.zig",
+        "src/deploy/commit/commit_test.zig",
+        "src/knowledge/ledger/ledger_test.zig",
+        "src/knowledge/store/store_test.zig",
+        "src/knowledge/summarize/summarize_test.zig",
+        "src/llm/transport/http/http.zig",
+        "src/llm/transport/transport_test.zig",
+        "src/monitoring/health/health_test.zig",
+        "src/monitoring/report/report_test.zig",
+        "src/util/fs/fs.zig",
+        "src/engine/main/main_test.zig",
+        "src/engine/main/main_cli_test.zig",
+        "src/orchestrator/decompose/decompose_test.zig",
+        "src/gateway/auth/auth_test.zig",
+        "src/util/cache/cache.zig",
+        "src/resilience/fallback/fallback_test.zig",
     };
     for (test_files) |tf| {
         const tmod = b.createModule(.{ .root_source_file = b.path(tf), .target = target, .optimize = optimize, .sanitize_thread = sanitize_thread });
         for (all, all_names) |other, name| tmod.addImport(name, other);
         const tt = b.addTest(.{ .root_module = tmod });
-        // Run the test binary directly in self-managed mode rather than through
-        // the `zig_test` IPC server protocol. On aarch64 the default LLVM
-        // backend selects server mode, and its protocol pipe deadlocks when this
-        // engine test spawns child processes (the composed program's compile and
-        // run) that inherit the pipe fds. Running the binary directly (no
-        // `--listen`) is correct and avoids the deadlock.
         const run_tt = std.Build.Step.Run.create(b, b.fmt("run {s}", .{tf}));
         run_tt.addArtifactArg(tt);
-        // Capture output to a real file instead of inheriting the build's pipe:
-        // `global_single_threaded` stdout is mangled through the build's
-        // run-step pipe, hiding the evaluator's `[evaluator] ...` diagnostics.
         run_tt.stdio = .inherit;
         test_step.dependOn(&run_tt.step);
     }

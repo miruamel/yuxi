@@ -12,7 +12,7 @@ test "engine.run aborts on a plan exceeding max-steps before codegen" {
     const allocator = std.heap.page_allocator;
     const io = std.Io.Threaded.global_single_threaded.io();
     const workdir = "/tmp/yuxi_max_steps_test";
-    std.Io.Dir.deleteTree(std.Io.Dir.cwd(), io, workdir) catch {};
+    std.Io.Dir.deleteTree(std.Io.Dir.cwd(), io, workdir) catch |e| if (e != error.FileNotFound) return e;
     try fs.ensureDir(allocator, workdir);
 
     // max_steps=2 but the mock decomposer always returns a 3-step plan, so the
@@ -48,7 +48,7 @@ test "orchestrator.run idempotent decomposition (mock backend)" {
     while (i < 5) : (i += 1) {
         const workdir = try std.fmt.allocPrint(allocator, "/tmp/yuxi_idempotent_test_{d}", .{i});
         defer allocator.free(workdir);
-        std.Io.Dir.deleteTree(std.Io.Dir.cwd(), io, workdir) catch {};
+        std.Io.Dir.deleteTree(std.Io.Dir.cwd(), io, workdir) catch |e| if (e != error.FileNotFound) return e;
         try fs.ensureDir(allocator, workdir);
 
         var ctx = try types.Ctx.init(allocator, io, .empty, .no_hitl, .mock, null, "", workdir);
@@ -88,7 +88,7 @@ test "orchestrator.run produces valid steps for varied tasks (mock backend)" {
     for (tasks) |task| {
         const workdir = try std.fmt.allocPrint(allocator, "/tmp/yuxi_varied_test_{s}", .{task});
         defer allocator.free(workdir);
-        std.Io.Dir.deleteTree(std.Io.Dir.cwd(), io, workdir) catch {};
+        std.Io.Dir.deleteTree(std.Io.Dir.cwd(), io, workdir) catch |e| if (e != error.FileNotFound) return e;
         try fs.ensureDir(allocator, workdir);
 
         var ctx = try types.Ctx.init(allocator, io, .empty, .no_hitl, .mock, null, "", workdir);
@@ -113,7 +113,7 @@ test "engine.run full pipeline deploys with mock backend" {
     const allocator = std.heap.page_allocator;
     const io = std.Io.Threaded.global_single_threaded.io();
     const workdir = "/tmp/yuxi_integration_test";
-    std.Io.Dir.deleteTree(std.Io.Dir.cwd(), io, workdir) catch {};
+    std.Io.Dir.deleteTree(std.Io.Dir.cwd(), io, workdir) catch |e| if (e != error.FileNotFound) return e;
     try fs.ensureDir(allocator, workdir);
 
     var ctx = try types.Ctx.init(allocator, io, .empty, .no_hitl, .mock, null, "", workdir);
@@ -141,7 +141,7 @@ test "engine.run with matching --expect deploys" {
     const allocator = std.heap.page_allocator;
     const io = std.Io.Threaded.global_single_threaded.io();
     const workdir = "/tmp/yuxi_expect_integration";
-    std.Io.Dir.deleteTree(std.Io.Dir.cwd(), io, workdir) catch {};
+    std.Io.Dir.deleteTree(std.Io.Dir.cwd(), io, workdir) catch |e| if (e != error.FileNotFound) return e;
     try fs.ensureDir(allocator, workdir);
 
     var ctx = try types.Ctx.init(allocator, io, .empty, .no_hitl, .mock, null, "", workdir);
@@ -160,7 +160,7 @@ test "engine.run with mismatching --expect aborts after retries" {
     const allocator = std.heap.page_allocator;
     const io = std.Io.Threaded.global_single_threaded.io();
     const workdir = "/tmp/yuxi_expect_fail_integration";
-    std.Io.Dir.deleteTree(std.Io.Dir.cwd(), io, workdir) catch {};
+    std.Io.Dir.deleteTree(std.Io.Dir.cwd(), io, workdir) catch |e| if (e != error.FileNotFound) return e;
     try fs.ensureDir(allocator, workdir);
 
     var ctx = try types.Ctx.init(allocator, io, .empty, .no_hitl, .mock, null, "", workdir);

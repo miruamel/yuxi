@@ -4,7 +4,7 @@ const config = @import("config");
 const engine = @import("engine");
 const knowledge = @import("knowledge");
 const monitoring = @import("monitoring");
-
+const fs = @import("fs");
 /// Per-task autonomy-health result. Defined in `monitoring` so a single run
 /// (main) and a batch run (runTasks) share one shape.
 pub const TaskResult = monitoring.TaskResult;
@@ -32,6 +32,8 @@ pub fn runTasks(allocator: std.mem.Allocator, io: std.Io, environ: std.process.E
         if (line.len == 0 or line[0] == '#') continue;
         idx += 1;
         const wd = try std.fmt.allocPrint(allocator, "{s}/{d}", .{ cfg.workdir, idx });
+        // Ensure the isolated task workdir exists before engine.run writes to it
+        try fs.ensureDir(allocator, wd);
         var ctx = engine.newCtx(allocator, io, environ, cfg, wd) catch |e| {
             types.logLine(io, "[loop] task {d} ctx build failed: {s}", .{ idx, @errorName(e) });
             continue;
