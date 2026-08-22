@@ -179,7 +179,41 @@ neither reached the ledger the way the two earlier autonomy caps did.
 - Removed `monitoring_test.zig`; updated `build.zig` test_files. All 24 test
   roots pass, `zig fmt --check src` clean.
 ### Human / Other Contributions
-- (none this cycle)
+### Deep nested architecture restructure per §8/§9 (refactor, architecture, §11/§14)
+- Reorganized `src/` from flat directories into **capability-based subtrees** with clear ownership at every level, each ≤5 files and ≤200 SLOC:
+  - `src/engine/{loop,config,types,compose,runlife,step,selfcorr/{plan_gate,recovery,gate},main}` — core autonomous loop
+  - `src/llm/{transport/{http,replay},transport_test}` — LLM transport backends (mock/openai/local via build options)
+  - `src/orchestrator/{decompose,bench}` — task decomposition
+  - `src/builder/generate` — code generation
+  - `src/critic/{denylist,bench}` — security review
+  - `src/evaluator/{compile,bench}` — compile+run verification
+  - `src/deploy/commit` — git checkpoint
+  - `src/gateway/auth` — auth/validation/redaction
+  - `src/knowledge/{ledger,summarize,store}` — lesson ledger
+  - `src/monitoring/{health,report}` — health/observability
+  - `src/resilience/fallback` — fallback/retry
+  - `src/util/{fs,cache}` — filesystem/cache
+- Rewrote `build.zig` completely to register all new module paths with correct nested structure
+- Verified: `zig build -j2`, `zig build test -j2` (all 24 test roots pass), `zig fmt --check src`, `zig build bench -j2` all pass
+### Full-pipeline integration tests for `engine.run` (test, §11/§21)
+- Added 3 integration tests in `src/orchestrator/decompose/decompose_test.zig` exercising the complete engine pipeline with the mock backend:
+  1. `engine.run full pipeline deploys with mock backend` — orchestrator → builder → critic → evaluator → deploy
+  2. `engine.run with matching --expect deploys` — behavioral verification via `--expect`
+  3. `engine.run with mismatching --expect aborts after retries` — self-correction exhausts retries without deploy
+- Catches end-to-end regressions that unit tests miss; all 3 pass in CI.
+
+### Security hardening: Thread Sanitizer + property tests (feat, security, testing, PR #44)
+- **Thread Sanitizer CI job**: `security-hardening` workflow runs `zig build -j2 -Dsanitize-thread=true` and `zig build test -j2 -Dsanitize-thread=true` on Ubuntu (Thread Sanitizer supported; Address/Undefined not available in Zig 0.16). Replaces CodeQL (unsupported for Zig).
+- **Property tests for `critic.dangerous` denylist** (`src/critic/denylist/denylist.zig`):
+  - `denylist comprehensive indirection coverage` — blocks `@field(std.process, "Child")`, `std.process.spawn`, `@field(std, "process").Child`, etc.
+  - `fast-path allows benign code` — mock-generated Zig passes.
+  - `fast-path blocks panic in various forms` — catches `std.debug.panic`, `@panic`, `unreachable` in generated code.
+- **Property tests for `orchestrator.run` idempotency** (`src/orchestrator/decompose/decompose_test.zig`):
+  - `orchestrator.run idempotent decomposition (mock backend)` — repeated calls produce identical plans.
+  - `orchestrator.run produces valid steps for varied tasks (mock backend)` — validates step structure across task variations.
+- All property/integration tests pass in CI; full suite green (24 test roots).
+
+### `config_test` asserts `--kb-stats` echoes `--kb-max-lines` cap (test, §11/§21) [`7aa179f`]
 
 ## v0.6.0 (2026-08-21)
 Seventh tagged release. Batches three substantive changes merged to `master` since v0.5.1.
