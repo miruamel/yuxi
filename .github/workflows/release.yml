@@ -1,0 +1,52 @@
+name: Release
+
+# Cut a release by pushing a tag (e.g. `v0.7.0`) from a CI-green master.
+# The tag is the source of truth for the version stamp (build.zig runs
+# `git describe --tags`), so the published binary carries the exact tag.
+on:
+  push:
+    tags:
+      - "v[0-9]*"
+
+# `gh release create` needs write access to repo contents.
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: release-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history + tags so `git describe` (build-time version stamp)
+          # resolves the pushed tag instead of an empty string.
+          fetch-depth: 0
+          fetch-tags: true
+      - name: Setup Zig
+        uses: mlugg/setup-zig@v2
+        with:
+          version: 0.16.0
+      - name: Build
+        run: zig build -j2
+      - name: Test
+        # Safety gate: a release tag must come from a CI-green commit. Re-running
+        # the suite here fails the release if a non-green commit was tagged.
+        run: zig build test -j2
+      - name: Format check
+        # Mirror ci.yml: the published artifact must be formatted. A release
+        # should not ship code that `zig fmt --check src` would reject.
+        run: zig fmt --check src
+      - name: Smoke test binary
+        # Confirms the version stamp resolved from the tag (yuxi <tag>).
+        run: ./zig-out/bin/yuxi --version
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            --title "${GITHUB_REF_NAME}" \
+            --generate-notes \
+            zig-out/bin/yuxi

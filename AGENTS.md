@@ -5,9 +5,10 @@ evolution engine described in `DESIGN.md`.
 Versioning is git-tag based. `build.zig` stamps the binary at build time via
 `git describe --tags --always --dirty`, injecting it into every module as
 `build_options.version` (no hand-maintained `version` constant in `src/`);
-`--version`/`-V` prints `yuxi <tag>` and exits 0. A release is still purely a
-tag + `gh release` from a CI-green master; the tag now also flows into the
-binary and the JSON health report's `version` field.
+`--version`/`-V` prints `yuxi <tag>` and exits 0. A release is cut by pushing a
+`v*` tag from a CI-green master; `.github/workflows/release.yml` builds the
+version-stamped binary and publishes a GitHub release with the asset attached,
+so the tag also flows into the binary and the JSON health report's `version` field.
 v0.1.0 (2026-08-19), v0.2.0 (2026-08-20), v0.3.0 are source tags (no binaries
 attached). Cut a release when a coherent batch of merged work accumulates
 (§28) — not per-PR.
