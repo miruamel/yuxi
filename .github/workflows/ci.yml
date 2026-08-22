@@ -42,4 +42,3 @@ jobs:
         run: zig build -j2 -Dsanitize-thread=true
       - name: Test with Thread Sanitizer
         run: zig build test -j2 -Dsanitize-thread=true
-

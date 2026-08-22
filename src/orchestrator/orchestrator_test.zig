@@ -105,3 +105,74 @@ test "orchestrator.run produces valid steps for varied tasks (mock backend)" {
         }
     }
 }
+
+// Integration test: full engine.run pipeline with mock backend.
+// Exercises orchestrator -> builder -> critic -> evaluator -> deploy
+// with the deterministic mock LLM, asserting a verified deploy.
+test "engine.run full pipeline deploys with mock backend" {
+    const allocator = std.heap.page_allocator;
+    const io = std.Io.Threaded.global_single_threaded.io();
+    const workdir = "/tmp/yuxi_integration_test";
+    std.Io.Dir.deleteTree(std.Io.Dir.cwd(), io, workdir) catch {};
+    try fs.ensureDir(allocator, workdir);
+
+    var ctx = try types.Ctx.init(allocator, io, .empty, .no_hitl, .mock, null, "", workdir);
+    // No max caps: let the full pipeline run to completion
+
+    try engine.run(allocator, io, &ctx, "build a simple calculator");
+
+    // Mock backend produces valid Zig that compiles and runs,
+    // so the evaluator verifies and deploy commits the artifact.
+    const final_path = try std.fmt.allocPrint(allocator, "{s}/gen_final.zig", .{workdir});
+    defer allocator.free(final_path);
+    try std.testing.expect(fs.fileExists(final_path));
+    try std.testing.expect(ctx.deploys == 1);
+    // No critic rejections expected with mock (always APPROVE)
+    try std.testing.expect(ctx.critic_rejections == 0);
+    // No mock fallbacks expected (mock path never falls back)
+    try std.testing.expect(ctx.mock_fallbacks == 0);
+    // Self-correction not needed (mock compiles on first attempt)
+    try std.testing.expect(ctx.retries == 0);
+}
+
+// Integration test: engine.run with --expect behavioral verification
+// Mock backend emits "step result: 2+3=5", so matching --expect passes.
+test "engine.run with matching --expect deploys" {
+    const allocator = std.heap.page_allocator;
+    const io = std.Io.Threaded.global_single_threaded.io();
+    const workdir = "/tmp/yuxi_expect_integration";
+    std.Io.Dir.deleteTree(std.Io.Dir.cwd(), io, workdir) catch {};
+    try fs.ensureDir(allocator, workdir);
+
+    var ctx = try types.Ctx.init(allocator, io, .empty, .no_hitl, .mock, null, "", workdir);
+    ctx.expected = try allocator.dupe(u8, "step result: 2+3=5");
+
+    try engine.run(allocator, io, &ctx, "build a simple calculator");
+
+    const final_path = try std.fmt.allocPrint(allocator, "{s}/gen_final.zig", .{workdir});
+    defer allocator.free(final_path);
+    try std.testing.expect(fs.fileExists(final_path));
+    try std.testing.expect(ctx.deploys == 1);
+}
+
+// Integration test: engine.run with mismatching --expect fails self-correction
+test "engine.run with mismatching --expect aborts after retries" {
+    const allocator = std.heap.page_allocator;
+    const io = std.Io.Threaded.global_single_threaded.io();
+    const workdir = "/tmp/yuxi_expect_fail_integration";
+    std.Io.Dir.deleteTree(std.Io.Dir.cwd(), io, workdir) catch {};
+    try fs.ensureDir(allocator, workdir);
+
+    var ctx = try types.Ctx.init(allocator, io, .empty, .no_hitl, .mock, null, "", workdir);
+    ctx.expected = try allocator.dupe(u8, "this output never appears");
+    ctx.max_attempts = 2; // limit retries for faster test
+
+    try engine.run(allocator, io, &ctx, "build a simple calculator");
+
+    // Mock output is deterministic and never matches wrong expectation,
+    // so self-correction exhausts max_attempts, no deploy.
+    // gen_final.zig is written during compose (before evaluation), so it exists.
+    // The real signal is deploy count: no deploy means the run was rejected.
+    try std.testing.expect(ctx.deploys == 0);
+    try std.testing.expect(ctx.retries >= 1); // at least one retry
+}
