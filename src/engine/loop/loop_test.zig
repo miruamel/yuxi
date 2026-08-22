@@ -58,7 +58,7 @@ test "loop.runTasks persists a batch summary to the KB when configured" {
     const workdir = "/tmp/yuxi_loop_test2";
     const kb_path = try std.fmt.allocPrint(allocator, "{s}/kb.md", .{kb_base});
     defer allocator.free(kb_path);
-    defer std.Io.Dir.deleteTree(std.Io.Dir.cwd(), io, kb_base) catch |e| if (e != error.FileNotFound) return e;
+    defer std.Io.Dir.deleteTree(std.Io.Dir.cwd(), io, kb_base) catch {};
 
     // Clean up any leftover state from previous runs
     std.Io.Dir.deleteTree(std.Io.Dir.cwd(), io, workdir) catch |e| if (e != error.FileNotFound) return e;
